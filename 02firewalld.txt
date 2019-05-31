@@ -1,0 +1,52 @@
+解决Failed to start firewalld.service: Unit is masked的问题：
+    [root@localhost ~]# systemctl status firewalld
+    ● firewalld.service
+       Loaded: masked (/dev/null; bad)
+       Active: inactive (dead)
+
+    May 31 10:27:53 localhost systemd[1]: Cannot add dependency job for unit firewalld.service, ignoring: Unit is masked.
+    Warning: firewalld.service changed on disk. Run 'systemctl daemon-reload' to reload units.
+    [root@localhost ~]# systemctl start firewalld
+    Failed to start firewalld.service: Unit is masked.
+    [root@localhost ~]# systemctl unmask firewalld.service
+    Removed symlink /etc/systemd/system/firewalld.service.
+    [root@localhost ~]# systemctl start firewalld.service
+    [root@localhost ~]# systemctl status firewalld
+    ● firewalld.service - firewalld - dynamic firewall daemon
+       Loaded: loaded (/usr/lib/systemd/system/firewalld.service; enabled; vendor preset: enabled)
+       Active: active (running) since Fri 2019-05-31 10:40:45 CST; 5min ago
+         Docs: man:firewalld(1)
+     Main PID: 2701 (firewalld)
+       CGroup: /system.slice/firewalld.service
+               └─2701 /usr/bin/python -Es /usr/sbin/firewalld --nofork --nopid
+
+    May 31 10:40:44 localhost systemd[1]: Starting firewalld - dynamic firewall daemon...
+    May 31 10:40:45 localhost systemd[1]: Started firewalld - dynamic firewall daemon.
+    [root@localhost ~]#
+
+查看开放端口
+    [root@localhost ~]# firewall-cmd --list-ports
+
+永久开启端口
+    [root@localhost ~]# firewall-cmd --zone=public --add-port=8080/tcp --permanent
+    success
+    [root@localhost ~]# firewall-cmd --zone=public --add-port=8090/tcp --permanent
+    success
+    [root@localhost ~]# firewall-cmd --zone=public --add-port=9000/tcp --permanent
+    success
+
+更新防火墙规则
+    [root@localhost ~]# firewall-cmd --reload
+    success
+
+查看开放端口
+    [root@localhost ~]# firewall-cmd --list-ports
+    8080/tcp 8090/tcp 9000/tcp
+
+永久关闭端口
+    [root@localhost ~]# firewall-cmd --zone=public --remove-port=9000/tcp --permanent
+    success
+    [root@localhost ~]# firewall-cmd --reload
+    success
+    [root@localhost ~]# firewall-cmd --list-ports
+    8080/tcp 8090/tcp
