@@ -1,0 +1,89 @@
+1、修改计算机名称
+    hostnamectl set-hostname <hostname>
+
+2、修改静态IP地址
+    TYPE="Ethernet"
+    PROXY_METHOD="none"
+    BROWSER_ONLY="no"
+    BOOTPROTO="dhcp"
+    DEFROUTE="yes"
+    IPV4_FAILURE_FATAL="no"
+    IPV6INIT="yes"
+    IPV6_AUTOCONF="yes"
+    IPV6_DEFROUTE="yes"
+    IPV6_FAILURE_FATAL="no"
+    IPV6_ADDR_GEN_MODE="stable-privacy"
+    NAME="ens33"
+    UUID="79c7153a-7bc9-4632-ac15-edab077e6dbe"
+    DEVICE="ens33"
+    ONBOOT="yes"
+    ZONE=
+
+    TYPE="Ethernet"
+    PROXY_METHOD="none"
+    BROWSER_ONLY="no"
+    BOOTPROTO="static"
+    IPADDR="192.168.238.123"
+    NETMASK="255.255.255.0"
+    GATEWAY="192.168.238.2"
+    DNS1="192.168.238.2"
+    DEFROUTE="yes"
+    IPV4_FAILURE_FATAL="no"
+    IPV6INIT="yes"
+    IPV6_AUTOCONF="yes"
+    IPV6_DEFROUTE="yes"
+    IPV6_FAILURE_FATAL="no"
+    IPV6_ADDR_GEN_MODE="stable-privacy"
+    NAME="ens33"
+    UUID="79c7153a-7bc9-4632-ac15-edab077e6dbe"
+    DEVICE="ens33"
+    ONBOOT="yes"
+
+
+
+2、修改hosts文件
+    [root@k8s_master ~]# cat /etc/hosts
+    127.0.0.1   localhost localhost.localdomain localhost4 localhost
+    127.0.0.1 localhost4.localdomain4
+    ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+    192.168.238.130 K8s_master
+    192.168.238.131 K8s_node_1
+    192.168.238.132 K8s_node_2
+
+3、多个机器之间传输文件
+    [root@k8s_master ~]# scp /root/scp.txt 192.168.238.131:/root
+    scp.txt
+
+4、查看端口是否被占用
+    [root@k8s_master ~]# yum install net-tools
+
+    # 查看80端口占用情况，找到PID 1059
+    [root@k8s_master ~]# netstat -lnp|grep 80
+    tcp        0      0 127.0.0.1:2380          0.0.0.0:*               LISTEN      2536/etcd
+    tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      1059/nginx: master
+    udp        0      0 0.0.0.0:68              0.0.0.0:*                           802/dhclient
+
+    # 查看PID 1059 的具体情况
+    [root@k8s_master ~]# ps 1059
+       PID TTY      STAT   TIME COMMAND
+      1059 ?        Ss     0:00 nginx: master process /usr/local/nginx/sbin/nginx -c /usr/local/nginx/conf/nginx.conf
+
+    # 杀掉 PID为1059的进程
+    [root@k8s_master ~]# kill -9 1059
+    [root@k8s_master ~]# netstat -lnp|grep 80
+    tcp        0      0 127.0.0.1:2380          0.0.0.0:*               LISTEN      2536/etcd
+    udp        0      0 0.0.0.0:68              0.0.0.0:*                           802/dhclient
+
+    # 一次性杀掉 80 端口占用的进程
+    [root@k8s_master ~]# netstat -lnp|grep 80
+    tcp        0      0 127.0.0.1:2380          0.0.0.0:*               LISTEN      2536/etcd
+    tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      2998/nginx: master
+    udp        0      0 0.0.0.0:68              0.0.0.0:*                           802/dhclient
+    [root@k8s_master ~]# lsof -i :80|grep -v "PID"|awk '{print "kill -9",$2}'|sh
+    [root@k8s_master ~]# netstat -lnp|grep 80
+    tcp        0      0 127.0.0.1:2380          0.0.0.0:*               LISTEN      2536/etcd
+    udp        0      0 0.0.0.0:68              0.0.0.0:*                           802/dhclient
+
+
+

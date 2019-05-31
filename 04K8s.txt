@@ -1,0 +1,271 @@
+前置条件：
+    先安装03docker.txt的方式安装docker
+
+    准备三台虚拟机
+        192.168.238.130 K8s_master 主节点
+        192.168.238.131 K8s_node_1
+        192.168.238.132 K8s_node_2
+
+1、安装K8s
+    Master 安装 etcd kubernetes flannel
+    [root@k8s_master ~]# yum -y install etcd kubernetes flannel
+
+    Node 安装 kubernetes flannel
+    [root@k8s_node_1 ~]# yum -y install kubernetes flannel
+    [root@k8s_node_2 ~]# yum -y install kubernetes flannel
+
+2、配置
+    master:
+        etc:
+            # 查看 etcd 配置：
+            [root@k8s_master ~]# cat /etc/etcd/etcd.conf
+
+            ETCD_DATA_DIR="/var/lib/etcd/default.etcd"
+            ETCD_LISTEN_CLIENT_URLS="http://localhost:2379"
+            ETCD_NAME="default"
+            ETCD_ADVERTISE_CLIENT_URLS="http://localhost:2379"
+
+            # 启动 etc 服务
+            [root@k8s_master ~]# systemctl enable etcd
+            Created symlink from /etc/systemd/system/multi-user.target.wants/etcd.service to /usr/lib/systemd/system/etcd.service.
+
+            [root@k8s_master ~]# systemctl start etcd
+
+            # etc 检查
+            [root@k8s_master ~]# etcdctl -C http://localhost:2379 cluster-health
+            member 8e9e05c52164694d is healthy: got healthy result from http://localhost:2379
+            cluster is healthy
+            [root@k8s_master ~]# etcdctl -C http://127.0.0.1:2379 cluster-health
+            member 8e9e05c52164694d is healthy: got healthy result from http://localhost:2379
+            cluster is healthy
+
+        apiservice:
+            # 查看 apiservice 配置
+            [root@k8s_master ~]# cat /etc/kubernetes/apiserver
+            ###
+            # kubernetes system config
+            #
+            # The following values are used to configure the kube-apiserver
+            #
+
+            # 注意，这里必须改为0.0.0.0
+            # The address on the local server to listen to.
+            KUBE_API_ADDRESS="--insecure-bind-address=0.0.0.0"
+
+            # The port on the local server to listen on.
+            # KUBE_API_PORT="--port=8080"
+
+            # Port minions listen on
+            # KUBELET_PORT="--kubelet-port=10250"
+
+            # Comma separated list of nodes in the etcd cluster
+            KUBE_ETCD_SERVERS="--etcd-servers=http://127.0.0.1:2379"
+
+            # Address range to use for services
+            KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
+
+            # default admission control policies
+            KUBE_ADMISSION_CONTROL="--admission-control=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
+
+            # Add your own!
+            KUBE_API_ARGS=""
+
+
+            # 查看 kubernetes config 配置
+            [root@k8s_master ~]# cat /etc/kubernetes/config
+            ###
+            # kubernetes system config
+            #
+            # The following values are used to configure various aspects of all
+            # kubernetes services, including
+            #
+            #   kube-apiserver.service
+            #   kube-controller-manager.service
+            #   kube-scheduler.service
+            #   kubelet.service
+            #   kube-proxy.service
+            # logging to stderr means we get it in the systemd journal
+            KUBE_LOGTOSTDERR="--logtostderr=true"
+
+            # journal message level, 0 is debug
+            KUBE_LOG_LEVEL="--v=0"
+
+            # Should this cluster be allowed to run privileged docker containers
+            KUBE_ALLOW_PRIV="--allow-privileged=false"
+
+            # How the controller-manager, scheduler, and proxy find the apiserver
+            KUBE_MASTER="--master=http://127.0.0.1:8080"
+
+
+            # 启动 kube-apiserver kube-controller-manager kube-scheduler 的服务
+            [root@k8s_master ~]# systemctl enable kube-apiserver.service
+            Created symlink from /etc/systemd/system/multi-user.target.wants/kube-apiserver.service to /usr/lib/systemd/system/kube-apiserver.service.
+            [root@k8s_master ~]# systemctl enable kube-controller-manager.service
+            Created symlink from /etc/systemd/system/multi-user.target.wants/kube-controller-manager.service to /usr/lib/systemd/system/kube-controller-manager.service.
+            [root@k8s_master ~]# systemctl enable kube-scheduler.service
+            Created symlink from /etc/systemd/system/multi-user.target.wants/kube-scheduler.service to /usr/lib/systemd/system/kube-scheduler.service.
+
+            [root@k8s_master ~]# systemctl start kube-apiserver.service
+            [root@k8s_master ~]# systemctl start kube-controller-manager.service
+            [root@k8s_master ~]# systemctl start kube-scheduler.service
+
+            # 查看启动状态
+            [root@k8s_master ~]# systemctl status kube-apiserver.service kube-controller-manager.service  kube-scheduler.service
+            ● kube-apiserver.service - Kubernetes API Server
+               Loaded: loaded (/usr/lib/systemd/system/kube-apiserver.service; enabled; vendor preset: disabled)
+               Active: active (running) since Fri 2019-05-31 15:13:41 CST; 21s ago
+                 Docs: https://github.com/GoogleCloudPlatform/kubernetes
+             Main PID: 3123 (kube-apiserver)
+               Memory: 74.9M
+               CGroup: /system.slice/kube-apiserver.service
+                       └─3123 /usr/bin/kube-apiserver --logtostderr=true --v=0 --etcd-servers=http://127.0.0.1:2379 --insecure-bind-address=127.0.0.1 --allow-privileged=false --service-cluster-ip-rang...
+
+            May 31 15:13:41 k8s_master kube-apiserver[3123]: I0531 15:13:41.503934    3123 storage_rbac.go:151] Created clusterrolebinding.rbac.authorization.k8s.io/system:node
+            May 31 15:13:41 k8s_master kube-apiserver[3123]: I0531 15:13:41.507895    3123 storage_rbac.go:151] Created clusterrolebinding.rbac.authorization.k8s.io/system:node-proxier
+            May 31 15:13:41 k8s_master kube-apiserver[3123]: I0531 15:13:41.565417    3123 storage_rbac.go:151] Created clusterrolebinding.rbac.authorization.k8s.io/system:controller:repli...n-controller
+            May 31 15:13:42 k8s_master kube-apiserver[3123]: I0531 15:13:42.066982    3123 trace.go:61] Trace "Create /api/v1/namespaces/default/services" (started 2019-05-31 15:13:41.4206... +0800 CST):
+            May 31 15:13:42 k8s_master kube-apiserver[3123]: [17.863µs] [17.863µs] About to convert to expected version
+            May 31 15:13:42 k8s_master kube-apiserver[3123]: [267.277µs] [249.414µs] Conversion done
+            May 31 15:13:42 k8s_master kube-apiserver[3123]: [642.62312ms] [642.355843ms] About to store object in database
+            May 31 15:13:42 k8s_master kube-apiserver[3123]: [646.283937ms] [3.660817ms] Object stored in database
+            May 31 15:13:42 k8s_master kube-apiserver[3123]: [646.291504ms] [7.567µs] Self-link added
+            May 31 15:13:42 k8s_master kube-apiserver[3123]: "Create /api/v1/namespaces/default/services" [646.34049ms] [48.986µs] END
+
+            ● kube-controller-manager.service - Kubernetes Controller Manager
+               Loaded: loaded (/usr/lib/systemd/system/kube-controller-manager.service; enabled; vendor preset: disabled)
+               Active: active (running) since Fri 2019-05-31 15:13:41 CST; 21s ago
+                 Docs: https://github.com/GoogleCloudPlatform/kubernetes
+             Main PID: 3169 (kube-controller)
+               Memory: 21.9M
+               CGroup: /system.slice/kube-controller-manager.service
+                       └─3169 /usr/bin/kube-controller-manager --logtostderr=true --v=0 --master=http://127.0.0.1:8080
+
+            May 31 15:13:45 k8s_master kube-controller-manager[3169]: I0531 15:13:45.617600    3169 disruption.go:319] Sending events to api server.
+            May 31 15:13:45 k8s_master kube-controller-manager[3169]: I0531 15:13:45.617787    3169 pet_set.go:146] Starting statefulset controller
+            May 31 15:13:45 k8s_master kube-controller-manager[3169]: I0531 15:13:45.886772    3169 controllermanager.go:544] Attempting to start certificates, full resource map map[authori...ctaccessrev
+            May 31 15:13:45 k8s_master kube-controller-manager[3169]: I0531 15:13:45.886898    3169 controllermanager.go:546] Starting certificates.k8s.io/v1alpha1 apis
+            May 31 15:13:45 k8s_master kube-controller-manager[3169]: I0531 15:13:45.886910    3169 controllermanager.go:548] Starting certificate request controller
+            May 31 15:13:45 k8s_master kube-controller-manager[3169]: E0531 15:13:45.887330    3169 controllermanager.go:558] Failed to start certificate controller: open /etc/kubernetes/ca...r directory
+            May 31 15:13:45 k8s_master kube-controller-manager[3169]: I0531 15:13:45.888816    3169 attach_detach_controller.go:235] Starting Attach Detach Controller
+            May 31 15:13:45 k8s_master kube-controller-manager[3169]: I0531 15:13:45.897378    3169 serviceaccounts_controller.go:120] Starting ServiceAccount controller
+            May 31 15:13:45 k8s_master kube-controller-manager[3169]: I0531 15:13:45.919498    3169 garbagecollector.go:766] Garbage Collector: Initializing
+            May 31 15:13:55 k8s_master kube-controller-manager[3169]: I0531 15:13:55.920576    3169 garbagecollector.go:780] Garbage Collector: All monitored resources synced. Proceeding to...ect garbage
+
+            ● kube-scheduler.service - Kubernetes Scheduler Plugin
+               Loaded: loaded (/usr/lib/systemd/system/kube-scheduler.service; enabled; vendor preset: disabled)
+               Active: active (running) since Fri 2019-05-31 15:13:58 CST; 3s ago
+                 Docs: https://github.com/GoogleCloudPlatform/kubernetes
+             Main PID: 3217 (kube-scheduler)
+               Memory: 18.8M
+               CGroup: /system.slice/kube-scheduler.service
+                       └─3217 /usr/bin/kube-scheduler --logtostderr=true --v=0 --master=http://127.0.0.1:8080
+
+            May 31 15:13:58 k8s_master systemd[1]: Started Kubernetes Scheduler Plugin.
+            May 31 15:13:58 k8s_master systemd[1]: Starting Kubernetes Scheduler Plugin...
+            May 31 15:13:59 k8s_master kube-scheduler[3217]: I0531 15:13:59.277422    3217 leaderelection.go:188] sucessfully acquired lease kube-system/kube-scheduler
+            May 31 15:13:59 k8s_master kube-scheduler[3217]: I0531 15:13:59.320751    3217 event.go:217] Event(api.ObjectReference{Kind:"Endpoints", Namespace:"kube-system", Name:"kube-scheduler", UID...
+            Hint: Some lines were ellipsized, use -l to show in full.
+            [root@k8s_master ~]#
+
+    Node
+        # 调整k8s_node_1和k8s_node_2 kubernetes config，KUBE_MASTER="--master=http://192.168.238.130:8080"
+            [root@k8s_node_1 ~]# cat /etc/kubernetes/config
+            ###
+            # kubernetes system config
+            #
+            # The following values are used to configure various aspects of all
+            # kubernetes services, including
+            #
+            #   kube-apiserver.service
+            #   kube-controller-manager.service
+            #   kube-scheduler.service
+            #   kubelet.service
+            #   kube-proxy.service
+            # logging to stderr means we get it in the systemd journal
+            KUBE_LOGTOSTDERR="--logtostderr=true"
+
+            # journal message level, 0 is debug
+            KUBE_LOG_LEVEL="--v=0"
+
+            # Should this cluster be allowed to run privileged docker containers
+            KUBE_ALLOW_PRIV="--allow-privileged=false"
+
+            # How the controller-manager, scheduler, and proxy find the apiserver
+            KUBE_MASTER="--master=http://192.168.238.130:8080"
+
+        # 调整k8s_node_1和k8s_node_2 kubelet，KUBELET_API_SERVER="--api-servers=http://192.168.238.130:8080"
+            [root@k8s_node_1 ~]# cat /etc/kubernetes/kubelet
+            ###
+            # kubernetes kubelet (minion) config
+
+            # The address for the info server to serve on (set to 0.0.0.0 or "" for all interfaces)
+            KUBELET_ADDRESS="--address=127.0.0.1"
+
+            # The port for the info server to serve on
+            # KUBELET_PORT="--port=10250"
+
+            # 调整为当前节点的ip地址
+            # You may leave this blank to use the actual hostname
+            KUBELET_HOSTNAME="--hostname-override=192.168.238.131"
+
+            # 调整为 K8s_master 的ip地址
+            # location of the api-server
+            KUBELET_API_SERVER="--api-servers=http://192.168.238.130:8080"
+
+            # pod infrastructure container
+            KUBELET_POD_INFRA_CONTAINER="--pod-infra-container-image=registry.access.redhat.com/rhel7/pod-infrastructure:latest"
+
+            # Add your own!
+            KUBELET_ARGS=""
+
+        # 启动Node节点的 kubelet、kube-proxy 服务
+            [root@k8s_node_2 ~]# systemctl enable kubelet
+            Created symlink from /etc/systemd/system/multi-user.target.wants/kubelet.service to /usr/lib/systemd/system/kubelet.service.
+            [root@k8s_node_2 ~]# systemctl enable kube-proxy
+            Created symlink from /etc/systemd/system/multi-user.target.wants/kube-proxy.service to /usr/lib/systemd/system/kube-proxy.service.
+            [root@k8s_node_2 ~]# systemctl start kubelet
+            [root@k8s_node_2 ~]# systemctl restart kube-proxy
+            [root@k8s_node_2 ~]# kubectl get nodes
+
+        # 移除节点
+            [root@k8s_master ~]# kubectl get nodes
+            NAME              STATUS     AGE
+            127.0.0.1         NotReady   2h
+            192.168.238.130   NotReady   47m
+            192.168.238.131   Ready      47m
+            192.168.238.132   Ready      47m
+            [root@k8s_master ~]# kubectl delete node 127.0.0.1
+            node "127.0.0.1" deleted
+            [root@k8s_master ~]# kubectl delete node 192.168.238.130
+            node "192.168.238.130" deleted
+            [root@k8s_master ~]# kubectl get nodes
+            NAME              STATUS    AGE
+            192.168.238.131   Ready     50m
+            192.168.238.132   Ready     50m
+
+        # Node 节点 NotReady
+            # Master第一次获取状态
+            [root@k8s_master ~]# kubectl get nodes
+            NAME              STATUS     AGE
+            192.168.238.131   Ready      54m
+            192.168.238.132   NotReady   54m
+
+            # 重启node2的 kebelet 和 kube-proxy 服务
+            [root@k8s_node_2 ~]# systemctl restart kubelet
+            [root@k8s_node_2 ~]# systemctl restart kube-proxy
+
+            # 重启 kubelet 后，Master重新获取状态
+            [root@k8s_master ~]# kubectl get nodes
+            NAME              STATUS    AGE
+            192.168.238.131   Ready     55m
+            192.168.238.132   Ready     55m
+
+
+
+
+
+
+
+
+
+
