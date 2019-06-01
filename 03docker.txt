@@ -4,7 +4,7 @@
    Loading mirror speeds from cached hostfile
    No package docker-ce available.
    Error: Nothing to do
-   [root@localhost ~]# yum install epel-release
+   [root@localhost ~]# yum -y install epel-release
    Loaded plugins: fastestmirror
    Loading mirror speeds from cached hostfile
    Resolving Dependencies
@@ -50,6 +50,7 @@
 3、启动Docker
     [root@localhost ~]# docker ps
     Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?
+    [root@localhost ~]# systemctl enable docker
     [root@localhost ~]# systemctl start docker
     [root@localhost ~]# docker ps
     CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
@@ -58,7 +59,7 @@
 3、修改Docker镜像源，/etc/docker/daemon.json写入以下内容
     [root@localhost ~]# cat /etc/docker/daemon.json
     {
-    	"registry-mirrors": ["http://hub-mirror.c.163.com"]
+        "registry-mirrors": ["http://hub-mirror.c.163.com"]
     }
 
 4、重启Docker

@@ -2,42 +2,30 @@
     hostnamectl set-hostname <hostname>
 
 2、修改静态IP地址
-    TYPE="Ethernet"
-    PROXY_METHOD="none"
-    BROWSER_ONLY="no"
-    BOOTPROTO="dhcp"
-    DEFROUTE="yes"
-    IPV4_FAILURE_FATAL="no"
-    IPV6INIT="yes"
-    IPV6_AUTOCONF="yes"
-    IPV6_DEFROUTE="yes"
-    IPV6_FAILURE_FATAL="no"
-    IPV6_ADDR_GEN_MODE="stable-privacy"
-    NAME="ens33"
-    UUID="79c7153a-7bc9-4632-ac15-edab077e6dbe"
-    DEVICE="ens33"
-    ONBOOT="yes"
-    ZONE=
+    [root@basic ~]# cd /etc/sysconfig/network-scripts/
+    [root@basic network-scripts]# vi ifcfg-ens33
+        TYPE="Ethernet"
+        PROXY_METHOD="none"
+        BROWSER_ONLY="no"
 
-    TYPE="Ethernet"
-    PROXY_METHOD="none"
-    BROWSER_ONLY="no"
-    BOOTPROTO="static"
-    IPADDR="192.168.238.123"
-    NETMASK="255.255.255.0"
-    GATEWAY="192.168.238.2"
-    DNS1="192.168.238.2"
-    DEFROUTE="yes"
-    IPV4_FAILURE_FATAL="no"
-    IPV6INIT="yes"
-    IPV6_AUTOCONF="yes"
-    IPV6_DEFROUTE="yes"
-    IPV6_FAILURE_FATAL="no"
-    IPV6_ADDR_GEN_MODE="stable-privacy"
-    NAME="ens33"
-    UUID="79c7153a-7bc9-4632-ac15-edab077e6dbe"
-    DEVICE="ens33"
-    ONBOOT="yes"
+        BOOTPROTO="static"
+        IPADDR="192.168.238.123"
+        NETMASK="255.255.255.0"
+        GATEWAY="192.168.238.2"
+        DNS1="192.168.238.2"
+
+        DEFROUTE="yes"
+        IPV4_FAILURE_FATAL="no"
+        IPV6INIT="yes"
+        IPV6_AUTOCONF="yes"
+        IPV6_DEFROUTE="yes"
+        IPV6_FAILURE_FATAL="no"
+        IPV6_ADDR_GEN_MODE="stable-privacy"
+        NAME="ens33"
+        UUID="79c7153a-7bc9-4632-ac15-edab077e6dbe"
+        DEVICE="ens33"
+        ONBOOT="yes"
+    [root@basic network-scripts]# reboot
 
 
 
