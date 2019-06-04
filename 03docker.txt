@@ -190,5 +190,646 @@
     [root@localhost ~]# docker ps -a
     CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
 
-10、docker部署springboot项目
-    // TODO
+====================================================================================================================================
+
+
+Docker 部署Nginx
+
+1、拉取Nginx镜像
+
+    [root@localhost ~]# docker pull nginx
+    Using default tag: latest
+    latest: Pulling from library/nginx
+    f7e2b70d04ae: Pull complete
+    08dd01e3f3ac: Pull complete
+    d9ef3a1eb792: Pull complete
+    Digest: sha256:98efe605f61725fd817ea69521b0eeb32bef007af0e3d0aeb6258c6e6fe7fc1a
+    Status: Downloaded newer image for nginx:latest
+
+2、查看拉取到的镜像
+    [root@localhost ~]# docker images
+    REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+    nginx               latest              881bd08c0b08        7 days ago          109MB
+
+3、在Docker中启用Nginx
+    [root@localhost ~]# docker run -p 80:80 --name myNginx -d nginx
+    ad7cc45c81ffadbd44254c1c043e048c677a4ebcd4ca618efcd098729cec2fa5
+
+4、查看启动的nginx进程
+    [root@localhost ~]# ps -ef|grep nginx
+    root      13223  13208  0 05:50 ?        00:00:00 nginx: master process nginx -g daemon off;
+    101       13253  13223  0 05:50 ?        00:00:00 nginx: worker process
+    root      13262  12350  0 05:50 pts/1    00:00:00 grep --color=auto nginx
+
+5、访问nginx
+    [root@localhost ~]# curl http://localhost:80/
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <title>Welcome to nginx!</title>
+    <style>
+        body {
+            width: 35em;
+            margin: 0 auto;
+            font-family: Tahoma, Verdana, Arial, sans-serif;
+        }
+    </style>
+    </head>
+    <body>
+    <h1>Welcome to nginx!</h1>
+    <p>If you see this page, the nginx web server is successfully installed and
+    working. Further configuration is required.</p>
+
+    <p>For online documentation and support please refer to
+    <a href="http://nginx.org/">nginx.org</a>.<br/>
+    Commercial support is available at
+    <a href="http://nginx.com/">nginx.com</a>.</p>
+
+    <p><em>Thank you for using nginx.</em></p>
+    </body>
+    </html>
+
+6、监测Nginx引用状态
+
+    [root@localhost ~]# docker inspect ad7cc45c81ffadbd44254c1c043e048c677a4ebcd4ca618efcd098729cec2fa5
+    [
+        {
+            "Id": "ad7cc45c81ffadbd44254c1c043e048c677a4ebcd4ca618efcd098729cec2fa5",
+            "Created": "2019-03-12T09:58:06.595522099Z",
+            "Path": "nginx",
+            "Args": [
+                "-g",
+                "daemon off;"
+            ],
+            "State": {
+                "Status": "running",
+                "Running": true,
+                "Paused": false,
+                "Restarting": false,
+                "OOMKilled": false,
+                "Dead": false,
+                "Pid": 13411,
+                "ExitCode": 0,
+                "Error": "",
+                "StartedAt": "2019-03-12T09:58:07.12571162Z",
+                "FinishedAt": "0001-01-01T00:00:00Z"
+            },
+            "Image": "sha256:881bd08c0b08234bd19136957f15e4301097f4646c1e700f7fea26e41fc40069",
+            "ResolvConfPath": "/var/lib/docker/containers/ad7cc45c81ffadbd44254c1c043e048c677a4ebcd4ca618efcd098729cec2fa5/resolv.conf",
+            "HostnamePath": "/var/lib/docker/containers/ad7cc45c81ffadbd44254c1c043e048c677a4ebcd4ca618efcd098729cec2fa5/hostname",
+            "HostsPath": "/var/lib/docker/containers/ad7cc45c81ffadbd44254c1c043e048c677a4ebcd4ca618efcd098729cec2fa5/hosts",
+            "LogPath": "/var/lib/docker/containers/ad7cc45c81ffadbd44254c1c043e048c677a4ebcd4ca618efcd098729cec2fa5/ad7cc45c81ffadbd44254c1c043e048c677a4ebcd4ca618efcd098729cec2fa5-json.log",
+            "Name": "/myNginx",
+            "RestartCount": 0,
+            "Driver": "overlay2",
+            "Platform": "linux",
+            "MountLabel": "",
+            "ProcessLabel": "",
+            "AppArmorProfile": "",
+            "ExecIDs": null,
+            "HostConfig": {
+                "Binds": null,
+                "ContainerIDFile": "",
+                "LogConfig": {
+                    "Type": "json-file",
+                    "Config": {}
+                },
+                "NetworkMode": "default",
+                "PortBindings": {
+                    "80/tcp": [
+                        {
+                            "HostIp": "",
+                            "HostPort": "80"
+                        }
+                    ]
+                },
+                "RestartPolicy": {
+                    "Name": "no",
+                    "MaximumRetryCount": 0
+                },
+                "AutoRemove": false,
+                "VolumeDriver": "",
+                "VolumesFrom": null,
+                "CapAdd": null,
+                "CapDrop": null,
+                "Dns": [],
+                "DnsOptions": [],
+                "DnsSearch": [],
+                "ExtraHosts": null,
+                "GroupAdd": null,
+                "IpcMode": "shareable",
+                "Cgroup": "",
+                "Links": null,
+                "OomScoreAdj": 0,
+                "PidMode": "",
+                "Privileged": false,
+                "PublishAllPorts": false,
+                "ReadonlyRootfs": false,
+                "SecurityOpt": null,
+                "UTSMode": "",
+                "UsernsMode": "",
+                "ShmSize": 67108864,
+                "Runtime": "runc",
+                "ConsoleSize": [
+                    0,
+                    0
+                ],
+                "Isolation": "",
+                "CpuShares": 0,
+                "Memory": 0,
+                "NanoCpus": 0,
+                "CgroupParent": "",
+                "BlkioWeight": 0,
+                "BlkioWeightDevice": [],
+                "BlkioDeviceReadBps": null,
+                "BlkioDeviceWriteBps": null,
+                "BlkioDeviceReadIOps": null,
+                "BlkioDeviceWriteIOps": null,
+                "CpuPeriod": 0,
+                "CpuQuota": 0,
+                "CpuRealtimePeriod": 0,
+                "CpuRealtimeRuntime": 0,
+                "CpusetCpus": "",
+                "CpusetMems": "",
+                "Devices": [],
+                "DeviceCgroupRules": null,
+                "DiskQuota": 0,
+                "KernelMemory": 0,
+                "MemoryReservation": 0,
+                "MemorySwap": 0,
+                "MemorySwappiness": null,
+                "OomKillDisable": false,
+                "PidsLimit": 0,
+                "Ulimits": null,
+                "CpuCount": 0,
+                "CpuPercent": 0,
+                "IOMaximumIOps": 0,
+                "IOMaximumBandwidth": 0,
+                "MaskedPaths": [
+                    "/proc/asound",
+                    "/proc/acpi",
+                    "/proc/kcore",
+                    "/proc/keys",
+                    "/proc/latency_stats",
+                    "/proc/timer_list",
+                    "/proc/timer_stats",
+                    "/proc/sched_debug",
+                    "/proc/scsi",
+                    "/sys/firmware"
+                ],
+                "ReadonlyPaths": [
+                    "/proc/bus",
+                    "/proc/fs",
+                    "/proc/irq",
+                    "/proc/sys",
+                    "/proc/sysrq-trigger"
+                ]
+            },
+            "GraphDriver": {
+                "Data": {
+                    "LowerDir": "/var/lib/docker/overlay2/bc9ef8c119903b79ec581081d835c447ce00b72eb70b07b45d14b3dde7a37c51-init/diff:/var/lib/docker/overlay2/2f3362aabe1d926214bed5c53a425fde596d23861cc6a59168c594974623876a/diff:/var/lib/docker/overlay2/56da5031c7fb61e617765323e953cd71e07679f202f56df818342500f409b50b/diff:/var/lib/docker/overlay2/1321013bc28d4931f52ab6cc47de24b57c6221686aa25c1acea18c7f87131070/diff",
+                    "MergedDir": "/var/lib/docker/overlay2/bc9ef8c119903b79ec581081d835c447ce00b72eb70b07b45d14b3dde7a37c51/merged",
+                    "UpperDir": "/var/lib/docker/overlay2/bc9ef8c119903b79ec581081d835c447ce00b72eb70b07b45d14b3dde7a37c51/diff",
+                    "WorkDir": "/var/lib/docker/overlay2/bc9ef8c119903b79ec581081d835c447ce00b72eb70b07b45d14b3dde7a37c51/work"
+                },
+                "Name": "overlay2"
+            },
+            "Mounts": [],
+            "Config": {
+                "Hostname": "ad7cc45c81ff",
+                "Domainname": "",
+                "User": "",
+                "AttachStdin": false,
+                "AttachStdout": false,
+                "AttachStderr": false,
+                "ExposedPorts": {
+                    "80/tcp": {}
+                },
+                "Tty": false,
+                "OpenStdin": false,
+                "StdinOnce": false,
+                "Env": [
+                    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                    "NGINX_VERSION=1.15.9-1~stretch",
+                    "NJS_VERSION=1.15.9.0.2.8-1~stretch"
+                ],
+                "Cmd": [
+                    "nginx",
+                    "-g",
+                    "daemon off;"
+                ],
+                "ArgsEscaped": true,
+                "Image": "nginx",
+                "Volumes": null,
+                "WorkingDir": "",
+                "Entrypoint": null,
+                "OnBuild": null,
+                "Labels": {
+                    "maintainer": "NGINX Docker Maintainers <docker-maint@nginx.com>"
+                },
+                "StopSignal": "SIGTERM"
+            },
+            "NetworkSettings": {
+                "Bridge": "",
+                "SandboxID": "c107fe699256ce2babfe253697e8920386d06d86dae4d91be13c0b6cca00aa08",
+                "HairpinMode": false,
+                "LinkLocalIPv6Address": "",
+                "LinkLocalIPv6PrefixLen": 0,
+                "Ports": {
+                    "80/tcp": [
+                        {
+                            "HostIp": "0.0.0.0",
+                            "HostPort": "80"
+                        }
+                    ]
+                },
+                "SandboxKey": "/var/run/docker/netns/c107fe699256",
+                "SecondaryIPAddresses": null,
+                "SecondaryIPv6Addresses": null,
+                "EndpointID": "88fa96a128cc924a9117cae0f720609ed70cad716892da3baf598e7f58a03ecc",
+                "Gateway": "172.17.0.1",
+                "GlobalIPv6Address": "",
+                "GlobalIPv6PrefixLen": 0,
+                "IPAddress": "172.17.0.2",
+                "IPPrefixLen": 16,
+                "IPv6Gateway": "",
+                "MacAddress": "02:42:ac:11:00:02",
+                "Networks": {
+                    "bridge": {
+                        "IPAMConfig": null,
+                        "Links": null,
+                        "Aliases": null,
+                        "NetworkID": "43fd51e168684e9ecd3684cf50beff2305983c747083d35e2b8a04d3470d775b",
+                        "EndpointID": "88fa96a128cc924a9117cae0f720609ed70cad716892da3baf598e7f58a03ecc",
+                        "Gateway": "172.17.0.1",
+                        "IPAddress": "172.17.0.2",
+                        "IPPrefixLen": 16,
+                        "IPv6Gateway": "",
+                        "GlobalIPv6Address": "",
+                        "GlobalIPv6PrefixLen": 0,
+                        "MacAddress": "02:42:ac:11:00:02",
+                        "DriverOpts": null
+                    }
+                }
+            }
+        }
+    ]
+
+7、停止Nginx应用
+    [root@localhost ~]# docker ps
+    CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                NAMES
+    ad7cc45c81ff        nginx               "nginx -g 'daemon of…"   23 seconds ago      Up 23 seconds       0.0.0.0:80->80/tcp   myNginx
+    [root@localhost ~]# docker stop ad7cc45c81ff
+    ad7cc45c81ff
+
+8、查看Nginx进程，访问80端口
+    [root@localhost ~]# ps -ef|grep nginx
+    root      13319  12350  0 05:50 pts/1    00:00:00 grep --color=auto nginx
+    [root@localhost ~]# curl http://localhost:80/
+    curl: (7) Failed connect to localhost:80; Connection refused
+
+9、删除Nginx应用Container（一般需要先停止后才能删除，强制删除使用 docker rm -f xxx）
+    [root@localhost ~]# docker stop ad7cc45c81ff
+    ad7cc45c81ff
+    [root@localhost ~]# docker rm ad7cc45c81ff
+    ad7cc45c81ff
+
+ 10、Docker的Nginx应用映射到主机8899端口
+
+    [root@localhost ~]# curl http://localhost:8899/
+    curl: (7) Failed connect to localhost:8899; Connection refused
+    [root@localhost ~]# docker run -p 8899:80 --name myNginx -d nginx
+    598c5f3d52e0511480eebb031c2cdee05b155054edd014ca22ca1bef49d62867
+    [root@localhost ~]# curl http://localhost:8899/
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <title>Welcome to nginx!</title>
+    <style>
+        body {
+            width: 35em;
+            margin: 0 auto;
+            font-family: Tahoma, Verdana, Arial, sans-serif;
+        }
+    </style>
+    </head>
+    <body>
+    <h1>Welcome to nginx!</h1>
+    <p>If you see this page, the nginx web server is successfully installed and
+    working. Further configuration is required.</p>
+
+    <p>For online documentation and support please refer to
+    <a href="http://nginx.org/">nginx.org</a>.<br/>
+    Commercial support is available at
+    <a href="http://nginx.com/">nginx.com</a>.</p>
+
+    <p><em>Thank you for using nginx.</em></p>
+    </body>
+    </html>
+
+========================================================================================================================
+
+Docker部署springboot项目
+
+1 centos7安装maven
+    [root@k8s_master ~]# yum -y install maven
+
+    [root@k8s_master springboot]# cat /usr/share/maven/conf/settings.xml
+    <?xml version="1.0" encoding="UTF-8"?>
+    ·······························
+      <mirrors>
+        <!-- mirror
+         | Specifies a repository mirror site to use instead of a given repository. The repository that
+         | this mirror serves has an ID that matches the mirrorOf element of this mirror. IDs are used
+         | for inheritance and direct lookup purposes, and must be unique across the set of mirrors.
+         |
+        <mirror>
+          <id>mirrorId</id>
+          <mirrorOf>repositoryId</mirrorOf>
+          <name>Human Readable Name for this Mirror.</name>
+          <url>http://my.repository.com/repo/path</url>
+        </mirror>
+         -->
+
+        <!-- 阿里镜像源 -->
+        <mirror>
+                <id>alimaven</id>
+                <name>aliyun maven</name>
+                <url>http://maven.aliyun.com/nexus/content/groups/public/</url>
+                <mirrorOf>central</mirrorOf>
+        </mirror>
+      </mirrors>
+    ·······························
+    </settings>
+    [root@k8s_master springboot]#
+
+2 本地构建Maven jar 包
+    以项目springboot为例，右侧边栏点击Maven，
+
+    clean:      boot->Lifecycle->clean
+    install:    boot->Lifecycle->install
+
+    将 springboot/target/boot-0.0.1-SNAPSHOT.jar 移动到 springboot/boot-0.0.1-SNAPSHOT.jar
+    新建 Dockerfile
+        ························
+        FROM java:8
+        VOLUME /tmp
+        COPY boot-0.0.1-SNAPSHOT.jar app.jar
+        RUN bash -c "touch /app.jar"
+        EXPOSE 8080
+        ENTRYPOINT ["java", "-jar", "app.jar", "--spring.profiles.active=test", "--server.port=8080", "> /log/app.log"]
+        ························
+3 使用xftp将 boot-0.0.1-SNAPSHOT.jar和Dockerfile 上传到 /mmmirana/projects/springboot
+
+    [root@k8s_master ~]# cd /mmmirana/projects/springboot
+    [root@k8s_master springboot]# ll
+    total 17712
+    -rw-r--r-- 1 root root 18130940 Jun  4 11:16 boot-0.0.1-SNAPSHOT.jar
+    -rw-r--r-- 1 root root      230 Jun  4 11:16 Dockerfile
+    [root@k8s_master springboot]#
+
+4 Docker 编译
+
+    # 拉取镜像失败
+    [root@k8s_master springboot]# docker build -t docker .
+    Sending build context to Docker daemon 18.13 MB
+    Step 1/6 : FROM java:8
+    Trying to pull repository docker.io/library/java ...
+    8: Pulling from docker.io/library/java
+    5040bd298390: Pulling fs layer
+    fce5728aad85: Pulling fs layer
+    76610ec20bf5: Pulling fs layer
+    60170fec2151: Waiting
+    e98f73de8f0d: Waiting
+    11f7af24ed9c: Waiting
+    49e2d6393f32: Waiting
+    bb9cdec9c7f3: Waiting
+    error pulling image configuration: unknown blob
+
+    # 修改镜像源
+    [root@k8s_master springboot]# cat /etc/docker/daemon.json
+    {
+        "registry-mirrors": ["http://c02963b7.m.daocloud.io"]
+    }
+
+    [root@k8s_master springboot]# docker build -t docker_springboot .
+    Sending build context to Docker daemon 18.13 MB
+    Step 1/6 : FROM java:8
+    Trying to pull repository docker.io/library/java ...
+    8: Pulling from docker.io/library/java
+    5040bd298390: Pulling fs layer
+    fce5728aad85: Pulling fs layer
+    76610ec20bf5: Pulling fs layer
+    60170fec2151: Waiting
+    e98f73de8f0d: Waiting
+    11f7af24ed9c: Waiting
+    49e2d6393f32: Waiting
+    bb9cdec9c7f3: Waiting
+    error pulling image configuration: unknown blob
+    [root@k8s_master springboot]# systemctl restart docker
+    [root@k8s_master springboot]# docker build -t docker_springboot .
+    Sending build context to Docker daemon 18.13 MB
+    Step 1/6 : FROM java:8
+    Trying to pull repository docker.io/library/java ...
+    8: Pulling from docker.io/library/java
+    5040bd298390: Pull complete
+    fce5728aad85: Pull complete
+    76610ec20bf5: Pull complete
+    60170fec2151: Pull complete
+    e98f73de8f0d: Pull complete
+    11f7af24ed9c: Pull complete
+    49e2d6393f32: Pull complete
+    bb9cdec9c7f3: Pull complete
+    Digest: sha256:c1ff613e8ba25833d2e1940da0940c3824f03f802c449f3d1815a66b7f8c0e9d
+    Status: Downloaded newer image for docker.io/java:8
+     ---> d23bdf5b1b1b
+    Step 2/6 : VOLUME /tmp
+     ---> Running in 1215513ea9ae
+     ---> 0ae91236c17e
+    Removing intermediate container 1215513ea9ae
+    Step 3/6 : COPY boot-0.0.1-SNAPSHOT.jar app.jar
+     ---> 1fffa1b67971
+    Removing intermediate container 00c187097b45
+    Step 4/6 : RUN bash -c "touch /app.jar"
+     ---> Running in aa7161f7c8c9
+
+     ---> 8968fb7a03c8
+    Removing intermediate container aa7161f7c8c9
+    Step 5/6 : EXPOSE 8080
+     ---> Running in ca583bfd27cc
+     ---> 83b43e691005
+    Removing intermediate container ca583bfd27cc
+    Step 6/6 : ENTRYPOINT java -jar app.jar --spring.profiles.active=test --server.port=8080 > /log/app.log
+     ---> Running in 01204a7e564f
+     ---> 8066693aa9b2
+    Removing intermediate container 01204a7e564f
+    Successfully built 8066693aa9b2
+    [root@k8s_master springboot]#
+
+5 启动两个SpringBoot的项目，内部8080分别映射到主机9091和9092端口
+
+    [root@k8s_master springboot]# docker images
+    REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+    docker_springboot   latest              8066693aa9b2        4 minutes ago       679 MB
+    docker.io/busybox   latest              64f5d945efcc        3 weeks ago         1.2 MB
+    docker.io/java      8                   d23bdf5b1b1b        2 years ago         643 MB
+
+    [root@k8s_master springboot]# docker run -d -p 9091:8080 --name springboot_9091 docker_springboot
+    203234cc7984da2b0f9484acb56fea0c6c8542e200b9df5f30cce10b3c63474a
+    [root@k8s_master springboot]# docker run -d -p 9092:8080 --name springboot_9092 docker_springboot
+    495c2b6a0943a85d37402978a40a836816062e753f189143b90dfb2709114f71
+    [root@k8s_master springboot]# docker ps
+    CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                    NAMES
+    495c2b6a0943        docker_springboot   "java -jar app.jar..."   4 seconds ago       Up 3 seconds        0.0.0.0:9092->8080/tcp   springboot_9092
+    203234cc7984        docker_springboot   "java -jar app.jar..."   10 seconds ago      Up 9 seconds        0.0.0.0:9091->8080/tcp   springboot_9091
+
+    [root@k8s_master springboot]# curl http://localhost:9091/springboot/myindex
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Title</title>
+    </head>
+    <body>
+    this is index page
+    </body>
+
+    </html>[root@k8s_master springboot]# curl http://localhost:9092/springboot/myindex
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Title</title>
+    </head>
+    <body>
+    this is index page
+    </body>
+
+6 查看docker 应用的日志
+
+    # 查看9091的日志
+    [root@k8s_master ~]# docker logs -f 203234cc7984
+      .   ____          _            __ _ _
+     /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+    ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+     \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+      '  |____| .__|_| |_|_| |_\__, | / / / /
+     =========|_|==============|___/=/_/_/_/
+     :: Spring Boot ::        (v2.1.0.RELEASE)
+    2019-06-04 06:31:45.748  INFO 1 --- [           main] com.mirana.boot.BootApplication          : Starting BootApplication v0.0.1-SNAPSHOT on 203234cc7984 with PID 1 (/app.jar started by root in /)
+    2019-06-04 06:31:45.783  INFO 1 --- [           main] com.mirana.boot.BootApplication          : The following profiles are active: test
+    2019-06-04 06:31:54.337  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+    2019-06-04 06:31:54.515  INFO 1 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+    2019-06-04 06:31:54.516  INFO 1 --- [           main] org.apache.catalina.core.StandardEngine  : Starting Servlet Engine: Apache Tomcat/9.0.12
+    2019-06-04 06:31:54.566  INFO 1 --- [           main] o.a.catalina.core.AprLifecycleListener   : The APR based Apache Tomcat Native library which allows optimal performance in production environments was not found on the java.library.path: [/usr/java/packages/lib/amd64:/usr/lib/x86_64-linux-gnu/jni:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/lib/jni:/lib:/usr/lib]
+    2019-06-04 06:31:55.128  INFO 1 --- [           main] o.a.c.c.C.[.[localhost].[/springboot]    : Initializing Spring embedded WebApplicationContext
+    2019-06-04 06:31:55.128  INFO 1 --- [           main] o.s.web.context.ContextLoader            : Root WebApplicationContext: initialization completed in 9095 ms
+    2019-06-04 06:31:55.322  INFO 1 --- [           main] o.s.b.w.servlet.ServletRegistrationBean  : Servlet dispatcherServlet mapped to [/]
+    2019-06-04 06:31:55.330  INFO 1 --- [           main] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'characterEncodingFilter' to: [/*]
+    2019-06-04 06:31:55.343  INFO 1 --- [           main] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'hiddenHttpMethodFilter' to: [/*]
+    2019-06-04 06:31:55.344  INFO 1 --- [           main] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'formContentFilter' to: [/*]
+    2019-06-04 06:31:55.344  INFO 1 --- [           main] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'requestContextFilter' to: [/*]
+    2019-06-04 06:31:56.941  INFO 1 --- [           main] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+    2019-06-04 06:31:59.072  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path '/springboot'
+    2019-06-04 06:31:59.095  INFO 1 --- [           main] com.mirana.boot.BootApplication          : Started BootApplication in 15.617 seconds (JVM running for 16.918)
+
+    2019-06-04 06:33:26.647  INFO 1 --- [nio-8080-exec-1] o.a.c.c.C.[.[localhost].[/springboot]    : Initializing Spring DispatcherServlet 'dispatcherServlet'
+    2019-06-04 06:33:26.647  INFO 1 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+    2019-06-04 06:33:26.670  INFO 1 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 23 ms
+    cb067846-a011-4c78-9508-c9d994b53481
+
+    # 查看9092的日志
+    [root@k8s_master ~]# docker logs -f 495c2b6a0943
+      .   ____          _            __ _ _
+     /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+    ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+     \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+      '  |____| .__|_| |_|_| |_\__, | / / / /
+     =========|_|==============|___/=/_/_/_/
+     :: Spring Boot ::        (v2.1.0.RELEASE)
+    2019-06-04 06:31:55.025  INFO 1 --- [           main] com.mirana.boot.BootApplication          : Starting BootApplication v0.0.1-SNAPSHOT on 495c2b6a0943 with PID 1 (/app.jar started by root in /)
+    2019-06-04 06:31:55.028  INFO 1 --- [           main] com.mirana.boot.BootApplication          : The following profiles are active: test
+    2019-06-04 06:32:02.137  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+    2019-06-04 06:32:02.288  INFO 1 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+    2019-06-04 06:32:02.288  INFO 1 --- [           main] org.apache.catalina.core.StandardEngine  : Starting Servlet Engine: Apache Tomcat/9.0.12
+    2019-06-04 06:32:02.327  INFO 1 --- [           main] o.a.catalina.core.AprLifecycleListener   : The APR based Apache Tomcat Native library which allows optimal performance in production environments was not found on the java.library.path: [/usr/java/packages/lib/amd64:/usr/lib/x86_64-linux-gnu/jni:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/lib/jni:/lib:/usr/lib]
+    2019-06-04 06:32:02.587  INFO 1 --- [           main] o.a.c.c.C.[.[localhost].[/springboot]    : Initializing Spring embedded WebApplicationContext
+    2019-06-04 06:32:02.591  INFO 1 --- [           main] o.s.web.context.ContextLoader            : Root WebApplicationContext: initialization completed in 7032 ms
+    2019-06-04 06:32:02.676  INFO 1 --- [           main] o.s.b.w.servlet.ServletRegistrationBean  : Servlet dispatcherServlet mapped to [/]
+    2019-06-04 06:32:02.682  INFO 1 --- [           main] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'characterEncodingFilter' to: [/*]
+    2019-06-04 06:32:02.683  INFO 1 --- [           main] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'hiddenHttpMethodFilter' to: [/*]
+    2019-06-04 06:32:02.683  INFO 1 --- [           main] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'formContentFilter' to: [/*]
+    2019-06-04 06:32:02.683  INFO 1 --- [           main] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'requestContextFilter' to: [/*]
+    2019-06-04 06:32:03.624  INFO 1 --- [           main] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+    2019-06-04 06:32:04.710  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path '/springboot'
+    2019-06-04 06:32:04.726  INFO 1 --- [           main] com.mirana.boot.BootApplication          : Started BootApplication in 14.042 seconds (JVM running for 16.767)
+
+    2019-06-04 06:33:39.252  INFO 1 --- [nio-8080-exec-1] o.a.c.c.C.[.[localhost].[/springboot]    : Initializing Spring DispatcherServlet 'dispatcherServlet'
+    2019-06-04 06:33:39.253  INFO 1 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+    2019-06-04 06:33:39.287  INFO 1 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 34 ms
+    ebe4f1a3-95e6-473a-8c97-50cb16bd0c35
+
+7 停止并删除应用
+    删除单个应用：
+        [root@k8s_master springboot]# docker ps -a
+        CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                    NAMES
+        495c2b6a0943        docker_springboot   "java -jar app.jar..."   4 minutes ago       Up 4 minutes        0.0.0.0:9092->8080/tcp   springboot_9092
+        203234cc7984        docker_springboot   "java -jar app.jar..."   4 minutes ago       Up 4 minutes        0.0.0.0:9091->8080/tcp   springboot_9091
+        [root@k8s_master springboot]# docker stop 495c2b6a0943
+        495c2b6a0943
+        [root@k8s_master springboot]# docker rm 495c2b6a0943
+        495c2b6a0943
+        [root@k8s_master springboot]# docker ps -a
+        CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                    NAMES
+        203234cc7984        docker_springboot   "java -jar app.jar..."   4 minutes ago       Up 4 minutes        0.0.0.0:9091->8080/tcp   springboot_9091
+
+    删除所有应用：
+        [root@k8s_master springboot]# docker stop $(docker ps -q)
+        203234cc7984
+        [root@k8s_master springboot]# docker rm $(docker ps -aq)
+        203234cc7984
+        [root@k8s_master springboot]# docker ps -a
+        CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+
+    一条命令删除所有应用：
+
+        [root@k8s_master springboot]# docker ps -a
+        CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+        [root@k8s_master springboot]# docker run -d -p 9091:8080 --name springboot_9091 docker_springboot
+        fb7901a789815a57096630b448fa2a4bac6631d0601fa6374a07f18958937b2c
+        ^[[A[root@k8s_master springboot]# docrun -d -p 9092:8080 --name springboot_9092 docker_springboot
+        2b03a8f68eb90e45b15b54781d5e0d0c53d24ea250facf515094af9ae25a6894
+        [root@k8s_master springboot]# docker ps -a
+        CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                    NAMES
+        2b03a8f68eb9        docker_springboot   "java -jar app.jar..."   3 seconds ago       Up 2 seconds        0.0.0.0:9092->8080/tcp   springboot_9092
+        fb7901a78981        docker_springboot   "java -jar app.jar..."   6 seconds ago       Up 5 seconds        0.0.0.0:9091->8080/tcp   springboot_9091
+
+        [root@k8s_master springboot]# docker ps --help
+
+        Usage:	docker ps [OPTIONS]
+
+        List containers
+
+        Options:
+         -a, --all             Show all containers (default shows just running)
+         -f, --filter filter   Filter output based on conditions provided
+             --format string   Pretty-print containers using a Go template
+             --help            Print usage
+         -n, --last int        Show n last created containers (includes all states) (default -1)
+         -l, --latest          Show the latest created container (includes all states)
+             --no-trunc        Don't truncate output
+         -q, --quiet           Only display numeric IDs
+         -s, --size            Display total file sizes
+
+        [root@k8s_master springboot]# docker stop $(docker ps -q) & docker rm -f $(docker ps -aq)
+        [1] 5881
+        2b03a8f68eb9
+        2b03a8f68eb9
+        fb7901a78981
+        fb7901a78981
+        [1]+  Done                    docker stop $(docker ps -q)
+
+
+
+
+

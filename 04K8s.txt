@@ -260,6 +260,11 @@
             192.168.238.131   Ready     55m
             192.168.238.132   Ready     55m
 
+        # 查看k8s版本
+            [root@k8s_master ~]# kubelet --version
+            Kubernetes v1.5.2
+
+
 
 
 
