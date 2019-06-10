@@ -44,7 +44,7 @@
     scp.txt
 
 4、查看端口是否被占用
-    [root@k8s_master ~]# yum install net-tools
+    [root@k8s_master ~]# yum -y install net-tools
 
     # 查看80端口占用情况，找到PID 1059
     [root@k8s_master ~]# netstat -lnp|grep 80
@@ -72,6 +72,56 @@
     [root@k8s_master ~]# netstat -lnp|grep 80
     tcp        0      0 127.0.0.1:2380          0.0.0.0:*               LISTEN      2536/etcd
     udp        0      0 0.0.0.0:68              0.0.0.0:*                           802/dhclient
+
+5、关闭并禁用nginx和tomcat
+    [root@localhost tomcat]# systemctl stop nginx && systemctl disable nginx
+    Removed symlink /etc/systemd/system/multi-user.target.wants/nginx.service.
+    [root@localhost tomcat]# systemctl stop tomcat && systemctl disable tomcat
+    tomcat.service is not a native service, redirecting to /sbin/chkconfig.
+    Executing /sbin/chkconfig tomcat off
+
+6、关闭selinux
+    [root@localhost tomcat]# vi /etc/selinux/config
+    [root@localhost tomcat]# getenforce
+    Disabled
+    [root@localhost tomcat]# /usr/sbin/sestatus -v
+    SELinux status:                 disabled
+
+7、关闭swap分区
+    [root@localhost tomcat]# echo "vm.swappiness = 0">> /etc/sysctl.conf
+    [root@localhost tomcat]# swapoff -a && swapon -a
+    [root@localhost tomcat]# sysctl -p
+    fs.file-max = 1000000
+    net.ipv4.tcp_max_tw_buckets = 6000
+    net.ipv4.tcp_sack = 1
+    net.ipv4.tcp_window_scaling = 1
+    net.ipv4.tcp_rmem = 4096 87380 4194304
+    net.ipv4.tcp_wmem = 4096 16384 4194304
+    net.ipv4.tcp_max_syn_backlog = 16384
+    net.core.netdev_max_backlog = 32768
+    net.core.somaxconn = 32768
+    net.core.wmem_default = 8388608
+    net.core.rmem_default = 8388608
+    net.core.rmem_max = 16777216
+    net.core.wmem_max = 16777216
+    net.ipv4.tcp_timestamps = 1
+    net.ipv4.tcp_fin_timeout = 20
+    net.ipv4.tcp_synack_retries = 2
+    net.ipv4.tcp_syn_retries = 2
+    net.ipv4.tcp_syncookies = 1
+    net.ipv4.tcp_tw_reuse = 1
+    net.ipv4.tcp_mem = 94500000 915000000 927000000
+    net.ipv4.tcp_max_orphans = 3276800
+    net.ipv4.ip_local_port_range = 1024 65000
+    net.nf_conntrack_max = 6553500
+    net.netfilter.nf_conntrack_max = 6553500
+    net.netfilter.nf_conntrack_tcp_timeout_close_wait = 60
+    net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 120
+    net.netfilter.nf_conntrack_tcp_timeout_time_wait = 120
+    net.netfilter.nf_conntrack_tcp_timeout_established = 3600
+    net.ipv4.ip_forward = 1
+    vm.swappiness = 0
+
 
 
 
