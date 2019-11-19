@@ -1418,6 +1418,7 @@ EOF
 
             # 添加k8smaster的hosts
             C:\Windows\System32\drivers\etc\hosts 添加:
+            # 添加集群中的任何一个节点的IP映射到tomcat.ingress.com都可以
             192.168.237.130 tomcat.ingress.com
 
             # curl 访问
