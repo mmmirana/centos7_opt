@@ -74,23 +74,39 @@
     udp        0      0 0.0.0.0:68              0.0.0.0:*                           802/dhclient
 
 5、关闭并禁用nginx和tomcat
-    [root@localhost tomcat]# systemctl stop nginx && systemctl disable nginx
+    [root@localhost ~]# systemctl stop nginx && systemctl disable nginx
     Removed symlink /etc/systemd/system/multi-user.target.wants/nginx.service.
-    [root@localhost tomcat]# systemctl stop tomcat && systemctl disable tomcat
+    [root@localhost ~]# systemctl stop tomcat && systemctl disable tomcat
     tomcat.service is not a native service, redirecting to /sbin/chkconfig.
     Executing /sbin/chkconfig tomcat off
 
 6、关闭selinux
-    [root@localhost tomcat]# vi /etc/selinux/config
-    [root@localhost tomcat]# getenforce
+    [root@localhost ~]# vi /etc/selinux/config
+
+    # 修改 SELINUX=enforcing 为 SELINUX=disabled ，重启后生效
+    # This file controls the state of SELinux on the system.
+    # SELINUX= can take one of these three values:
+    #     enforcing - SELinux security policy is enforced.
+    #     permissive - SELinux prints warnings instead of enforcing.
+    #     disabled - No SELinux policy is loaded.
+    # SELINUX=enforcing
+    SELINUX=disabled
+
+    # SELINUXTYPE= can take one of three values:
+    #     targeted - Targeted processes are protected,
+    #     minimum - Modification of targeted policy. Only selected processes are protected.
+    #     mls - Multi Level Security protection.
+    SELINUXTYPE=targeted
+
+    [root@localhost ~]# getenforce
     Disabled
-    [root@localhost tomcat]# /usr/sbin/sestatus -v
+    [root@localhost ~]# /usr/sbin/sestatus -v
     SELinux status:                 disabled
 
 7、关闭swap分区
-    [root@localhost tomcat]# echo "vm.swappiness = 0">> /etc/sysctl.conf
-    [root@localhost tomcat]# swapoff -a && swapon -a
-    [root@localhost tomcat]# sysctl -p
+    [root@localhost ~]# echo "vm.swappiness = 0">> /etc/sysctl.conf
+    [root@localhost ~]# swapoff -a && swapon -a
+    [root@localhost ~]# sysctl -p
     fs.file-max = 1000000
     net.ipv4.tcp_max_tw_buckets = 6000
     net.ipv4.tcp_sack = 1
@@ -122,6 +138,26 @@
     net.ipv4.ip_forward = 1
     vm.swappiness = 0
 
+8、开启路由转发
+    [root@localhost ~]sed -i '/net.ipv4.ip_forward/ s/\(.*= \).*/\11/' /etc/sysctl.conf
 
+9、开启 net.bridge.bridge-nf-call-ip6tables 和 net.bridge.bridge-nf-call-iptables
+    cat <<EOF >  /etc/sysctl.d/k8s.conf
+    net.bridge.bridge-nf-call-ip6tables = 1
+    net.bridge.bridge-nf-call-iptables = 1
+    EOF
 
+    sysctl -p /etc/sysctl.d/k8s.conf
 
+10、添加 kubernetes 镜像源
+    cat <<EOF > kubernetes.repo
+    [kubernetes]
+    name=Kubernetes
+    baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64
+    enabled=1
+    gpgcheck=1
+    repo_gpgcheck=1
+    gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
+    EOF
+
+    mv kubernetes.repo /etc/yum.repos.d/

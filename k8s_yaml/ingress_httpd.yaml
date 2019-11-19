@@ -1,0 +1,12 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: httpd-test
+spec:
+  rules:
+    - host: test.ingress.com # 这里必须是dns可以解析的地址，不能是ip
+      http:
+        paths:
+          - backend:
+              serviceName: httpd
+              servicePort: 8000

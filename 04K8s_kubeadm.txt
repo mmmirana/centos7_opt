@@ -1,0 +1,1468 @@
+一、准备的文本
+    1、k8s.conf
+        cat <<EOF >  /etc/sysctl.d/k8s.conf
+        net.bridge.bridge-nf-call-ip6tables = 1
+        net.bridge.bridge-nf-call-iptables = 1
+        EOF
+
+        sysctl -p /etc/sysctl.d/k8s.conf
+
+    2、kubernetes.repo
+cat <<EOF > kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
+EOF
+
+        mv kubernetes.repo /etc/yum.repos.d/
+
+    3、kubeadm init
+        # calico
+        kubeadm init --image-repository=registry.aliyuncs.com/google_containers --pod-network-cidr=192.168.0.0/16
+
+        # flannel
+        kubeadm init --image-repository=registry.aliyuncs.com/google_containers --pod-network-cidr=10.244.0.0/16
+
+二、虚拟机准备
+    192.168.237.130	k8smaster   2cpu 2g
+    192.168.237.131	k8snode1    1cpu 1g
+    192.168.237.132	k8snode2    1cpu 1g
+
+    1、关闭防火墙，本地centos7.6，关闭防火墙可以ping通但是无法访问端口，这里还是加入防火墙规则
+    2、关闭selinux
+    3、关闭swap分区
+    4、调整bridge-nf-call-iptables
+    [root@k8smaster ~]# cat <<EOF >  /etc/sysctl.d/k8s.conf
+    > net.bridge.bridge-nf-call-ip6tables = 1
+    > net.bridge.bridge-nf-call-iptables = 1
+    > EOF
+    [root@k8smaster ~]# sysctl -p /etc/sysctl.d/k8s.conf
+    net.bridge.bridge-nf-call-ip6tables = 1
+    net.bridge.bridge-nf-call-iptables = 1
+
+    192.168.237.130	k8smaster
+    192.168.237.131	k8snode1
+    192.168.237.132	k8snode2
+
+三、使用 kubeadm 安装k8s集群
+1、k8smaster k8snode1 k8snode2 安装 docker
+    [root@k8smaster ~]# yum install -y yum-utils
+    [root@k8smaster ~]# yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+    [root@k8smaster ~]# yum install -y docker-ce
+    [root@k8smaster ~]# systemctl enable docker && systemctl start docker
+        Created symlink from /etc/systemd/system/multi-user.target.wants/docker.service to /usr/lib/systemd/system/docker.service.
+    [root@k8smaster ~]# docker -v
+        Docker version 19.03.4, build 9013bf583a
+    [root@k8smaster ~]# docker version
+        Client: Docker Engine - Community
+         Version:           19.03.4
+         API version:       1.40
+         Go version:        go1.12.10
+         Git commit:        9013bf583a
+         Built:             Fri Oct 18 15:52:22 2019
+         OS/Arch:           linux/amd64
+         Experimental:      false
+
+        Server: Docker Engine - Community
+         Engine:
+          Version:          19.03.4
+          API version:      1.40 (minimum version 1.12)
+          Go version:       go1.12.10
+          Git commit:       9013bf583a
+          Built:            Fri Oct 18 15:50:54 2019
+          OS/Arch:          linux/amd64
+          Experimental:     false
+         containerd:
+          Version:          1.2.10
+          GitCommit:        b34a5c8af56e510852c35414db4c1f4fa6172339
+         runc:
+          Version:          1.0.0-rc8+dev
+          GitCommit:        3e425f80a8c931f88e6d94a8c831b9d5aa481657
+         docker-init:
+          Version:          0.18.0
+          GitCommit:        fec3683
+
+        ```
+        cat <<EOF > /etc/docker/daemon.json
+        {
+            "registry-mirrors": ["https://zpqszrst.mirror.aliyuncs.com"]
+        }
+        EOF
+        ```
+
+        [root@k8smaster ~]# cat <<EOF > /etc/docker/daemon.json
+        > {
+        >     "registry-mirrors": ["https://zpqszrst.mirror.aliyuncs.com"]
+        > }
+        > EOF
+        [root@k8smaster ~]# cat /etc/docker/daemon.json
+        {
+          "registry-mirrors": ["https://zpqszrst.mirror.aliyuncs.com"]
+        }
+
+
+2、k8smaster k8snode1 k8snode2 创建 kubernetes.repo 国内镜像
+    [root@k8smaster ~]# cat <<EOF > kubernetes.repo
+    > [kubernetes]
+    > name=Kubernetes
+    > baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64
+    > enabled=1
+    > gpgcheck=1
+    > repo_gpgcheck=1
+    > gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
+    > EOF
+    [root@k8smaster ~]# mv kubernetes.repo /etc/yum.repos.d/
+
+3、k8smaster k8snode1 k8snode2 安装 kubelet kubeadm kubectl
+    [root@k8smaster ~]# yum install -y kubelet kubeadm kubectl
+    [root@k8smaster ~]# kubeadm version
+    kubeadm version: &version.Info{Major:"1", Minor:"16", GitVersion:"v1.16.2", GitCommit:"c97fe5036ef3df2967d086711e6c0c405941e14b", GitTreeState:"clean", BuildDate:"2019-10-15T19:15:39Z", GoVersion:"go1.12.10", Compiler:"gc", Platform:"linux/amd64"}
+    [root@k8smaster ~]# systemctl enable kubelet.service
+
+4、k8smaster 初始化集群
+    [root@k8smaster ~]# kubeadm init --image-repository=registry.aliyuncs.com/google_containers --pod-network-cidr=10.244.0.0/16
+    W1117 00:40:13.893157   17787 version.go:101] could not fetch a Kubernetes version from the internet: unable to get URL "https://dl.k8s.io/release/stable-1.txt": Get https://dl.k8s.io/release/stable-1.txt: dial tcp 35.201.71.162:443: connect: connection timed out
+    W1117 00:40:13.893213   17787 version.go:102] falling back to the local client version: v1.16.2
+    [init] Using Kubernetes version: v1.16.2
+    [preflight] Running pre-flight checks
+    	[WARNING Firewalld]: firewalld is active, please ensure ports [6443 10250] are open or your cluster may not function correctly
+    	[WARNING IsDockerSystemdCheck]: detected "cgroupfs" as the Docker cgroup driver. The recommended driver is "systemd". Please follow the guide at https://kubernetes.io/docs/setup/cri/
+    	[WARNING SystemVerification]: this Docker version is not on the list of validated versions: 19.03.4. Latest validated version: 18.09
+    [preflight] Pulling images required for setting up a Kubernetes cluster
+    [preflight] This might take a minute or two, depending on the speed of your internet connection
+    [preflight] You can also perform this action in beforehand using 'kubeadm config images pull'
+    [kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+    [kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+    [kubelet-start] Activating the kubelet service
+    [certs] Using certificateDir folder "/etc/kubernetes/pki"
+    [certs] Generating "ca" certificate and key
+    [certs] Generating "apiserver" certificate and key
+    [certs] apiserver serving cert is signed for DNS names [k8smaster kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs [10.96.0.1 192.168.237.130]
+    [certs] Generating "apiserver-kubelet-client" certificate and key
+    [certs] Generating "front-proxy-ca" certificate and key
+    [certs] Generating "front-proxy-client" certificate and key
+    [certs] Generating "etcd/ca" certificate and key
+    [certs] Generating "etcd/server" certificate and key
+    [certs] etcd/server serving cert is signed for DNS names [k8smaster localhost] and IPs [192.168.237.130 127.0.0.1 ::1]
+    [certs] Generating "etcd/peer" certificate and key
+    [certs] etcd/peer serving cert is signed for DNS names [k8smaster localhost] and IPs [192.168.237.130 127.0.0.1 ::1]
+    [certs] Generating "etcd/healthcheck-client" certificate and key
+    [certs] Generating "apiserver-etcd-client" certificate and key
+    [certs] Generating "sa" key and public key
+    [kubeconfig] Using kubeconfig folder "/etc/kubernetes"
+    [kubeconfig] Writing "admin.conf" kubeconfig file
+    [kubeconfig] Writing "kubelet.conf" kubeconfig file
+    [kubeconfig] Writing "controller-manager.conf" kubeconfig file
+    [kubeconfig] Writing "scheduler.conf" kubeconfig file
+    [control-plane] Using manifest folder "/etc/kubernetes/manifests"
+    [control-plane] Creating static Pod manifest for "kube-apiserver"
+    [control-plane] Creating static Pod manifest for "kube-controller-manager"
+    [control-plane] Creating static Pod manifest for "kube-scheduler"
+    [etcd] Creating static Pod manifest for local etcd in "/etc/kubernetes/manifests"
+    [wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory "/etc/kubernetes/manifests". This can take up to 4m0s
+    [apiclient] All control plane components are healthy after 15.502329 seconds
+    [upload-config] Storing the configuration used in ConfigMap "kubeadm-config" in the "kube-system" Namespace
+    [kubelet] Creating a ConfigMap "kubelet-config-1.16" in namespace kube-system with the configuration for the kubelets in the cluster
+    [upload-certs] Skipping phase. Please see --upload-certs
+    [mark-control-plane] Marking the node k8smaster as control-plane by adding the label "node-role.kubernetes.io/master=''"
+    [mark-control-plane] Marking the node k8smaster as control-plane by adding the taints [node-role.kubernetes.io/master:NoSchedule]
+    [bootstrap-token] Using token: hn2q0y.6fgzfjufcu3zyqji
+    [bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles
+    [bootstrap-token] configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials
+    [bootstrap-token] configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token
+    [bootstrap-token] configured RBAC rules to allow certificate rotation for all node client certificates in the cluster
+    [bootstrap-token] Creating the "cluster-info" ConfigMap in the "kube-public" namespace
+    [addons] Applied essential addon: CoreDNS
+    [addons] Applied essential addon: kube-proxy
+
+    Your Kubernetes control-plane has initialized successfully!
+
+    To start using your cluster, you need to run the following as a regular user:
+
+      mkdir -p $HOME/.kube
+      sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+      sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+    You should now deploy a pod network to the cluster.
+    Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+      https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+    Then you can join any number of worker nodes by running the following on each as root:
+
+    kubeadm join 192.168.237.130:6443 --token hn2q0y.6fgzfjufcu3zyqji \
+        --discovery-token-ca-cert-hash sha256:64dfee924b039116e4da016c646a96d5d13208176f80bb4b160592f39fe8e5e8
+    [root@k8smaster ~]# mkdir -p $HOME/.kube
+    [root@k8smaster ~]# sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+    [root@k8smaster ~]# sudo chown $(id -u):$(id -g) $HOME/.kube/config
+    [root@k8smaster ~]#
+
+5、加入worker节点
+    [root@k8snode1 ~]# kubeadm join 192.168.237.130:6443 --token hn2q0y.6fgzfjufcu3zyqji     --discovery-token-ca-cert-hash sha256:64dfee924b039116e4da016c646a96d5d13208176f80bb4b160592f39fe8e5e8
+    [preflight] Running pre-flight checks
+    	[WARNING IsDockerSystemdCheck]: detected "cgroupfs" as the Docker cgroup driver. The recommended driver is "systemd". Please follow the guide at https://kubernetes.io/docs/setup/cri/
+    	[WARNING SystemVerification]: this Docker version is not on the list of validated versions: 19.03.4. Latest validated version: 18.09
+    [preflight] Reading configuration from the cluster...
+    [preflight] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -oyaml'
+    [kubelet-start] Downloading configuration for the kubelet from the "kubelet-config-1.16" ConfigMap in the kube-system namespace
+    [kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+    [kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+    [kubelet-start] Activating the kubelet service
+    [kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap...
+
+    This node has joined the cluster:
+    * Certificate signing request was sent to apiserver and a response was received.
+    * The Kubelet was informed of the new secure connection details.
+
+    Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+
+    # 查看现有节点和pods
+    [root@k8smaster ~]# kubectl get nodes
+    NAME        STATUS     ROLES    AGE     VERSION
+    k8smaster   NotReady   master   4m58s   v1.16.2
+    k8snode1    NotReady   <none>   3m9s    v1.16.2
+    [root@k8smaster ~]# kubectl get pods -A -o wide
+    NAMESPACE     NAME                                READY   STATUS    RESTARTS   AGE     IP                NODE        NOMINATED NODE   READINESS GATES
+    kube-system   coredns-58cc8c89f4-bcrfd            0/1     Pending   0          4m52s   <none>            <none>      <none>           <none>
+    kube-system   coredns-58cc8c89f4-jfvgc            0/1     Pending   0          4m52s   <none>            <none>      <none>           <none>
+    kube-system   etcd-k8smaster                      1/1     Running   0          3m45s   192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-apiserver-k8smaster            1/1     Running   0          3m46s   192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-controller-manager-k8smaster   1/1     Running   0          4m8s    192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-proxy-c9nxm                    1/1     Running   0          4m52s   192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-proxy-swvdd                    1/1     Running   0          3m22s   192.168.237.131   k8snode1    <none>           <none>
+    kube-system   kube-scheduler-k8smaster            1/1     Running   0          4m1s    192.168.237.130   k8smaster   <none>           <none>
+
+6、网络部署
+    # k8s_yaml/kube-flannel.yml
+    [root@k8smaster ~]# wget https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+    --2019-11-17 00:48:13--  https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+    Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 151.101.228.133
+    Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|151.101.228.133|:443... connected.
+    HTTP request sent, awaiting response... 200 OK
+    Length: 14416 (14K) [text/plain]
+    Saving to: ‘kube-flannel.yml’
+
+    100%[========================================================================================================================================================================>] 14,416      8.18KB/s   in 1.7s
+
+    2019-11-17 00:48:18 (8.18 KB/s) - ‘kube-flannel.yml’ saved [14416/14416]
+
+    [root@k8smaster ~]# sed -i 's#quay.io#quay-mirror.qiniu.com#g' kube-flannel.yml
+    [root@k8smaster ~]# kubectl apply -f kube-flannel.yml
+    podsecuritypolicy.policy/psp.flannel.unprivileged created
+    clusterrole.rbac.authorization.k8s.io/flannel created
+    clusterrolebinding.rbac.authorization.k8s.io/flannel created
+    serviceaccount/flannel created
+    configmap/kube-flannel-cfg created
+    daemonset.apps/kube-flannel-ds-amd64 created
+    daemonset.apps/kube-flannel-ds-arm64 created
+    daemonset.apps/kube-flannel-ds-arm created
+    daemonset.apps/kube-flannel-ds-ppc64le created
+    daemonset.apps/kube-flannel-ds-s390x created
+
+    # 等待 flannel 网络部署完成
+    [root@k8smaster ~]# kubectl get nodes
+    NAME        STATUS   ROLES    AGE   VERSION
+    k8smaster   Ready    master   13m   v1.16.2
+    k8snode1    Ready    <none>   11m   v1.16.2
+    [root@k8smaster ~]# kubectl get pods -A -o wide
+    NAMESPACE     NAME                                READY   STATUS    RESTARTS   AGE     IP                NODE        NOMINATED NODE   READINESS GATES
+    kube-system   coredns-58cc8c89f4-bcrfd            1/1     Running   0          12m     10.244.1.2        k8snode1    <none>           <none>
+    kube-system   coredns-58cc8c89f4-jfvgc            1/1     Running   0          12m     10.244.1.3        k8snode1    <none>           <none>
+    kube-system   etcd-k8smaster                      1/1     Running   0          11m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-apiserver-k8smaster            1/1     Running   0          11m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-controller-manager-k8smaster   1/1     Running   0          12m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-flannel-ds-amd64-czlzs         1/1     Running   0          2m36s   192.168.237.131   k8snode1    <none>           <none>
+    kube-system   kube-flannel-ds-amd64-nbbnt         1/1     Running   0          2m36s   192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-proxy-c9nxm                    1/1     Running   0          12m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-proxy-swvdd                    1/1     Running   0          11m     192.168.237.131   k8snode1    <none>           <none>
+    kube-system   kube-scheduler-k8smaster            1/1     Running   0          12m     192.168.237.130   k8smaster   <none>           <none>
+
+    # 查看现有的ip配置
+    [root@k8smaster ~]# ip addr
+    1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+        link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+        inet 127.0.0.1/8 scope host lo
+           valid_lft forever preferred_lft forever
+        inet6 ::1/128 scope host
+           valid_lft forever preferred_lft forever
+    2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+        link/ether 00:0c:29:1b:17:c0 brd ff:ff:ff:ff:ff:ff
+        inet 192.168.237.130/24 brd 192.168.237.255 scope global noprefixroute ens33
+           valid_lft forever preferred_lft forever
+        inet6 fe80::f372:a63a:5e2e:ace5/64 scope link noprefixroute
+           valid_lft forever preferred_lft forever
+    3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default
+        link/ether 02:42:15:ad:fa:6b brd ff:ff:ff:ff:ff:ff
+        inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+           valid_lft forever preferred_lft forever
+    4: flannel.1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UNKNOWN group default
+        link/ether 9e:85:5e:36:6b:4a brd ff:ff:ff:ff:ff:ff
+        inet 10.244.0.0/32 scope global flannel.1
+           valid_lft forever preferred_lft forever
+        inet6 fe80::9c85:5eff:fe36:6b4a/64 scope link
+           valid_lft forever preferred_lft forever
+
+   [root@k8snode1 ~]#  ip addr
+   1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+       link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+       inet 127.0.0.1/8 scope host lo
+          valid_lft forever preferred_lft forever
+       inet6 ::1/128 scope host
+          valid_lft forever preferred_lft forever
+   2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+       link/ether 00:0c:29:12:2c:10 brd ff:ff:ff:ff:ff:ff
+       inet 192.168.237.131/24 brd 192.168.237.255 scope global noprefixroute ens33
+          valid_lft forever preferred_lft forever
+       inet6 fe80::f372:a63a:5e2e:ace5/64 scope link noprefixroute
+          valid_lft forever preferred_lft forever
+   3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default
+       link/ether 02:42:0f:ad:ea:bf brd ff:ff:ff:ff:ff:ff
+       inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+          valid_lft forever preferred_lft forever
+   4: flannel.1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UNKNOWN group default
+       link/ether b2:75:13:1e:08:a4 brd ff:ff:ff:ff:ff:ff
+       inet 10.244.1.0/32 scope global flannel.1
+          valid_lft forever preferred_lft forever
+       inet6 fe80::b075:13ff:fe1e:8a4/64 scope link
+          valid_lft forever preferred_lft forever
+
+7、再加入一个worker节点
+    [root@k8snode2 ~]# kubeadm join 192.168.237.130:6443 --token hn2q0y.6fgzfjufcu3zyqji     --discovery-token-ca-cert-hash sha256:64dfee924b039116e4da016c646a96d5d13208176f80bb4b160592f39fe8e5e8
+    [preflight] Running pre-flight checks
+    	[WARNING IsDockerSystemdCheck]: detected "cgroupfs" as the Docker cgroup driver. The recommended driver is "systemd". Please follow the guide at https://kubernetes.io/docs/setup/cri/
+    	[WARNING SystemVerification]: this Docker version is not on the list of validated versions: 19.03.4. Latest validated version: 18.09
+    [preflight] Reading configuration from the cluster...
+    [preflight] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -oyaml'
+    [kubelet-start] Downloading configuration for the kubelet from the "kubelet-config-1.16" ConfigMap in the kube-system namespace
+    [kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+    [kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+    [kubelet-start] Activating the kubelet service
+    [kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap...
+
+    This node has joined the cluster:
+    * Certificate signing request was sent to apiserver and a response was received.
+    * The Kubelet was informed of the new secure connection details.
+
+    Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+
+    [root@k8smaster ~]# kubectl get nodes
+    NAME        STATUS   ROLES    AGE   VERSION
+    k8smaster   Ready    master   17m   v1.16.2
+    k8snode1    Ready    <none>   15m   v1.16.2
+    k8snode2    Ready    <none>   60s   v1.16.2
+    [root@k8smaster ~]# kubectl get pods -A -o wide
+    NAMESPACE     NAME                                READY   STATUS    RESTARTS   AGE    IP                NODE        NOMINATED NODE   READINESS GATES
+    kube-system   coredns-58cc8c89f4-bcrfd            1/1     Running   0          17m    10.244.1.2        k8snode1    <none>           <none>
+    kube-system   coredns-58cc8c89f4-jfvgc            1/1     Running   0          17m    10.244.1.3        k8snode1    <none>           <none>
+    kube-system   etcd-k8smaster                      1/1     Running   0          16m    192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-apiserver-k8smaster            1/1     Running   0          16m    192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-controller-manager-k8smaster   1/1     Running   0          16m    192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-flannel-ds-amd64-czlzs         1/1     Running   0          7m8s   192.168.237.131   k8snode1    <none>           <none>
+    kube-system   kube-flannel-ds-amd64-jr4ww         1/1     Running   0          64s    192.168.237.132   k8snode2    <none>           <none>
+    kube-system   kube-flannel-ds-amd64-nbbnt         1/1     Running   0          7m8s   192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-proxy-82bxp                    1/1     Running   0          64s    192.168.237.132   k8snode2    <none>           <none>
+    kube-system   kube-proxy-c9nxm                    1/1     Running   0          17m    192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-proxy-swvdd                    1/1     Running   0          15m    192.168.237.131   k8snode1    <none>           <none>
+    kube-system   kube-scheduler-k8smaster            1/1     Running   0          16m    192.168.237.130   k8smaster   <none>           <none>
+
++、删除work节点
+    # 删除work节点
+    [root@k8smaster ~]# kubectl drain k8snode1 --delete-local-data --force --ignore-daemonsets
+    node/k8snode1 cordoned
+    WARNING: ignoring DaemonSet-managed Pods: kube-system/kube-flannel-ds-amd64-czlzs, kube-system/kube-proxy-swvdd
+    evicting pod "coredns-58cc8c89f4-jfvgc"
+    evicting pod "coredns-58cc8c89f4-bcrfd"
+    pod/coredns-58cc8c89f4-bcrfd evicted
+    pod/coredns-58cc8c89f4-jfvgc evicted
+    node/k8snode1 evicted
+    [root@k8smaster ~]# kubectl delete node k8snode1
+    node "k8snode1" deleted
+
+    # 查看剩余nodes
+    [root@k8smaster ~]# kubectl get nodes
+    NAME        STATUS   ROLES    AGE     VERSION
+    k8smaster   Ready    master   23m     v1.16.2
+    k8snode2    Ready    <none>   6m30s   v1.16.2
+    [root@k8smaster ~]# kubectl get pods -A -o wide
+    NAMESPACE     NAME                                READY   STATUS    RESTARTS   AGE     IP                NODE        NOMINATED NODE   READINESS GATES
+    kube-system   coredns-58cc8c89f4-s4k8n            1/1     Running   0          35s     10.244.0.2        k8smaster   <none>           <none>
+    kube-system   coredns-58cc8c89f4-s52j4            1/1     Running   0          35s     10.244.2.2        k8snode2    <none>           <none>
+    kube-system   etcd-k8smaster                      1/1     Running   0          21m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-apiserver-k8smaster            1/1     Running   0          21m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-controller-manager-k8smaster   1/1     Running   0          22m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-flannel-ds-amd64-jr4ww         1/1     Running   0          6m36s   192.168.237.132   k8snode2    <none>           <none>
+    kube-system   kube-flannel-ds-amd64-nbbnt         1/1     Running   0          12m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-proxy-82bxp                    1/1     Running   0          6m36s   192.168.237.132   k8snode2    <none>           <none>
+    kube-system   kube-proxy-c9nxm                    1/1     Running   0          23m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-scheduler-k8smaster            1/1     Running   0          22m     192.168.237.130   k8smaster   <none>           <none>
+
+    # 重新加入 node1
+    [root@k8snode1 ~]# kubeadm join 192.168.237.130:6443 --token hn2q0y.6fgzfjufcu3zyqji     --discovery-token-ca-cert-hash sha256:64dfee924b039116e4da016c646a96d5d13208176f80bb4b160592f39fe8e5e8
+    [preflight] Running pre-flight checks
+    	[WARNING IsDockerSystemdCheck]: detected "cgroupfs" as the Docker cgroup driver. The recommended driver is "systemd". Please follow the guide at https://kubernetes.io/docs/setup/cri/
+    	[WARNING SystemVerification]: this Docker version is not on the list of validated versions: 19.03.4. Latest validated version: 18.09
+    [preflight] Reading configuration from the cluster...
+    [preflight] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -oyaml'
+    [kubelet-start] Downloading configuration for the kubelet from the "kubelet-config-1.16" ConfigMap in the kube-system namespace
+    [kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+    [kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+    [kubelet-start] Activating the kubelet service
+    [kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap...
+
+    This node has joined the cluster:
+    * Certificate signing request was sent to apiserver and a response was received.
+    * The Kubelet was informed of the new secure connection details.
+
+    Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+
+    # 重新加入查看nodes
+    [root@k8smaster ~]# kubectl get nodes
+    NAME        STATUS   ROLES    AGE     VERSION
+    k8smaster   Ready    master   26m     v1.16.2
+    k8snode1    Ready    <none>   38s     v1.16.2
+    k8snode2    Ready    <none>   9m52s   v1.16.2
+    [root@k8smaster ~]# kubectl get pods -A -o wide
+    NAMESPACE     NAME                                READY   STATUS    RESTARTS   AGE     IP                NODE        NOMINATED NODE   READINESS GATES
+    kube-system   coredns-58cc8c89f4-s4k8n            1/1     Running   0          3m52s   10.244.0.2        k8smaster   <none>           <none>
+    kube-system   coredns-58cc8c89f4-s52j4            1/1     Running   0          3m52s   10.244.2.2        k8snode2    <none>           <none>
+    kube-system   etcd-k8smaster                      1/1     Running   0          25m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-apiserver-k8smaster            1/1     Running   0          25m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-controller-manager-k8smaster   1/1     Running   0          25m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-flannel-ds-amd64-jr4ww         1/1     Running   0          9m53s   192.168.237.132   k8snode2    <none>           <none>
+    kube-system   kube-flannel-ds-amd64-nbbnt         1/1     Running   0          15m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-flannel-ds-amd64-spx92         1/1     Running   0          39s     192.168.237.131   k8snode1    <none>           <none>
+    kube-system   kube-proxy-82bxp                    1/1     Running   0          9m53s   192.168.237.132   k8snode2    <none>           <none>
+    kube-system   kube-proxy-c9nxm                    1/1     Running   0          26m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-proxy-pbsmm                    1/1     Running   0          39s     192.168.237.131   k8snode1    <none>           <none>
+    kube-system   kube-scheduler-k8smaster            1/1     Running   0          25m     192.168.237.130   k8smaster   <none>           <none>
+
+    # token 失效
+    [root@k8smaster ~]# kubeadm token create --print-join-command
+    kubeadm join 192.168.237.130:6443 --token ztrucr.smoy0c9qd9gsedc0     --discovery-token-ca-cert-hash sha256:64dfee924b039116e4da016c646a96d5d13208176f80bb4b160592f39fe8e5e8
+
+=========== 加入快照 kubeadm+flannel部署完成
+四、K8s部署第一个应用程序
+
+    1、创建secret，避免拉取镜像失败
+        # 通过kubectl生成secret
+        [root@k8smaster ~]# kubectl create secret docker-registry k8s-docker-secret --docker-server=registry.cn-hangzhou.aliyuncs.com --docker-username=18166748035@163.com --docker-password=****** --docker-email=18166748035@163.com
+        secret/k8s-docker-secret created
+        # 查看 secret
+        [root@k8smaster ~]# kubectl get secrets
+        NAME                  TYPE                                  DATA   AGE
+        default-token-f2tm6   kubernetes.io/service-account-token   3      2d17h
+        k8s-docker-secret     kubernetes.io/dockerconfigjson        1      11m
+        # 查看 k8s-docker-secret 详情
+        [root@k8smaster ~]# kubectl describe secrets  k8s-docker-secret
+        Name:         k8s-docker-secret
+        Namespace:    default
+        Labels:       <none>
+        Annotations:  <none>
+
+        Type:  kubernetes.io/dockerconfigjson
+
+        Data
+        ====
+        .dockerconfigjson:  186 bytes
+
+    2、创建应用（在pod部署的节点上，通过flannel的网络访问应用）
+        # 使用 nginx-deplyment.yaml 创建应用
+        [root@k8smaster ~]# cat nginx-deployment.yaml
+        apiVersion: apps/v1     #与k8s集群版本有关，使用 kubectl api-versions 即可查看当前集群支持的版本
+        kind: Deployment        #该配置的类型，我们使用的是 Deployment
+        metadata:               #译名为元数据，即 Deployment 的一些基本属性和信息
+          name: nginx-deployment        #Deployment 的名称
+          labels:           #标签，可以灵活定位一个或多个资源，其中key和value均可自定义，可以定义多组，目前不需要理解
+            app: nginx  #为该Deployment设置key为app，value为nginx的标签
+        spec:           #这是关于该Deployment的描述，可以理解为你期待该Deployment在k8s中如何使用
+          replicas: 1   #使用该Deployment创建一个应用程序实例
+          selector:         #标签选择器，与上面的标签共同作用，目前不需要理解
+            matchLabels: #选择包含标签app:nginx的资源
+              app: nginx
+          template:         #这是选择或创建的Pod的模板
+            metadata:   #Pod的元数据
+              labels:   #Pod的标签，上面的selector即选择包含标签app:nginx的Pod
+                app: nginx
+            spec:           #期望Pod实现的功能（即在pod中部署）
+              containers:       #生成container，与docker中的container是同一种
+              - name: nginx     #container的名称
+                image: registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx:0.1 #使用阿里云私有镜像最新的nginx创建container，该container默认80端口可访问
+                imagePullPolicy: IfNotPresent   # Always: 总是pull；IfNotPresent: 本地有使用本地，没有的话pull；Never: 只使用本地镜像
+              imagePullSecrets:
+              - name: k8s-docker-secret
+
+        [root@k8smaster ~]# kubectl apply -f nginx-deployment.yaml
+        deployment.apps/nginx-deployment created
+        [root@k8smaster ~]# kubectl get deployments
+        NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+        nginx-deployment   1/1     1            1           100s
+        # 查看nginx的pods
+        [root@k8smaster ~]# kubectl get pods -o wide
+        NAME                                READY   STATUS    RESTARTS   AGE    IP            NODE       NOMINATED NODE   READINESS GATES
+        nginx-deployment-6f68986c79-c2w8w   1/1     Running   0          112s   10.244.2.17   k8snode2   <none>           <none>
+
+        # 进入 nginx 容器执行命令
+        [root@k8smaster ~]# kubectl exec -it nginx-deployment-6f68986c79-c2w8w bash
+        root@nginx-deployment-6f68986c79-c2w8w:/# nginx -v
+        nginx version: nginx/1.17.5
+        root@nginx-deployment-6f68986c79-c2w8w:/# which nginx
+        /usr/sbin/nginx
+        root@nginx-deployment-6f68986c79-c2w8w:/#
+
+        # nginx的pod随机部署到k8snode2节点，切换到 node1 节点，尝试访问nginx的服务
+
+        # 通过localhost访问应该不通，只能通过pod ip（flannel.1）访问
+        [root@k8snode1 ~]# curl http://localhost:80
+        curl: (7) Failed connect to localhost:80; Connection refused
+
+        [root@k8snode2 ~]# curl http://10.244.2.17:80
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <title>Welcome to nginx!</title>
+        <style>
+            body {
+                width: 35em;
+                margin: 0 auto;
+                font-family: Tahoma, Verdana, Arial, sans-serif;
+            }
+        </style>
+        </head>
+        <body>
+        <h1>Welcome to nginx!</h1>
+        <p>If you see this page, the nginx web server is successfully installed and
+        working. Further configuration is required.</p>
+
+        <p>For online documentation and support please refer to
+        <a href="http://nginx.org/">nginx.org</a>.<br/>
+        Commercial support is available at
+        <a href="http://nginx.com/">nginx.com</a>.</p>
+
+        <p><em>Thank you for using nginx.</em></p>
+        </body>
+        </html>
+
+        # 强制重启 nginx 的 pod
+        [root@k8smaster ~]# kubectl replace --force -f nginx-deployment.yaml
+        deployment.apps "nginx-deployment" deleted
+        deployment.apps/nginx-deployment replaced
+        [root@k8smaster ~]# kubectl get pods -o wide
+        NAME                                READY   STATUS    RESTARTS   AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+        nginx-deployment-6f68986c79-n8spk   1/1     Running   0          4s    10.244.1.16   k8snode1   <none>           <none>
+
+        # 此时 nginx pod 随机部署到 k8snode1 节点（即使仍然部署在k8snode2，ip也会发生变更） 如果要访问的话，需要通过k8snode1终端的新IP来访问
+        [root@k8snode2 ~]# curl http://10.244.2.17:80
+        curl: (7) Failed connect to 10.244.2.17:80; Connection timed out
+
+        [root@k8snode1 ~]# curl http://10.244.1.16:80
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <title>Welcome to nginx!</title>
+        <style>
+            body {
+                width: 35em;
+                margin: 0 auto;
+                font-family: Tahoma, Verdana, Arial, sans-serif;
+            }
+        </style>
+        </head>
+        <body>
+        <h1>Welcome to nginx!</h1>
+        <p>If you see this page, the nginx web server is successfully installed and
+        working. Further configuration is required.</p>
+
+        <p>For online documentation and support please refer to
+        <a href="http://nginx.org/">nginx.org</a>.<br/>
+        Commercial support is available at
+        <a href="http://nginx.com/">nginx.com</a>.</p>
+
+        <p><em>Thank you for using nginx.</em></p>
+        </body>
+        </html>
+
+     3、通过label指定pod部署的node节点
+        # 获取所有node label 详情
+        [root@k8smaster ~]# kubectl get node --show-labels
+        NAME        STATUS   ROLES    AGE     VERSION   LABELS
+        k8smaster   Ready    master   2d18h   v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8smaster,kubernetes.io/os=linux,node-role.kubernetes.io/master=
+        k8snode1    Ready    <none>   2d9h    v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8snode1,kubernetes.io/os=linux
+        k8snode2    Ready    <none>   2d9h    v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8snode2,kubernetes.io/os=linux
+        # k8snode1 添加label qwer=zxc (key=value)
+        [root@k8smaster ~]# kubectl label node k8snode1 qwer=zxc
+        node/k8snode1 labeled
+        [root@k8smaster ~]# kubectl get node --show-labels
+        NAME        STATUS   ROLES    AGE     VERSION   LABELS
+        k8smaster   Ready    master   2d18h   v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8smaster,kubernetes.io/os=linux,node-role.kubernetes.io/master=
+        k8snode1    Ready    <none>   2d9h    v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8snode1,kubernetes.io/os=linux,qwer=zxc
+        k8snode2    Ready    <none>   2d9h    v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8snode2,kubernetes.io/os=linux
+        # k8snode2 添加label qwer=abc (key=value)
+        [root@k8smaster ~]# kubectl label node k8snode2 qwer=abc
+        node/k8snode2 labeled
+        [root@k8smaster ~]# kubectl get node --show-labels
+        NAME        STATUS   ROLES    AGE     VERSION   LABELS
+        k8smaster   Ready    master   2d18h   v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8smaster,kubernetes.io/os=linux,node-role.kubernetes.io/master=
+        k8snode1    Ready    <none>   2d9h    v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8snode1,kubernetes.io/os=linux,qwer=zxc
+        k8snode2    Ready    <none>   2d9h    v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8snode2,kubernetes.io/os=linux,qwer=abc
+
+        # 测试label
+        [root@k8smaster ~]# kubectl delete -f nginx-deployment.yaml
+        deployment.apps "nginx-deployment" deleted
+        [root@k8smaster ~]# kubectl get pods -A -o wide
+        NAMESPACE     NAME                                READY   STATUS    RESTARTS   AGE     IP                NODE        NOMINATED NODE   READINESS GATES
+        kube-system   coredns-58cc8c89f4-s4k8n            1/1     Running   4          2d18h   10.244.0.9        k8smaster   <none>           <none>
+        kube-system   coredns-58cc8c89f4-v642x            1/1     Running   3          2d9h    10.244.0.10       k8smaster   <none>           <none>
+        kube-system   etcd-k8smaster                      1/1     Running   4          2d18h   192.168.237.130   k8smaster   <none>           <none>
+        kube-system   kube-apiserver-k8smaster            1/1     Running   4          2d18h   192.168.237.130   k8smaster   <none>           <none>
+        kube-system   kube-controller-manager-k8smaster   1/1     Running   4          2d18h   192.168.237.130   k8smaster   <none>           <none>
+        kube-system   kube-flannel-ds-amd64-nbbnt         1/1     Running   6          2d18h   192.168.237.130   k8smaster   <none>           <none>
+        kube-system   kube-flannel-ds-amd64-zgf8j         1/1     Running   5          2d9h    192.168.237.131   k8snode1    <none>           <none>
+        kube-system   kube-flannel-ds-amd64-ztq29         1/1     Running   5          2d9h    192.168.237.132   k8snode2    <none>           <none>
+        kube-system   kube-proxy-c9nxm                    1/1     Running   4          2d18h   192.168.237.130   k8smaster   <none>           <none>
+        kube-system   kube-proxy-kxcwm                    1/1     Running   4          2d9h    192.168.237.131   k8snode1    <none>           <none>
+        kube-system   kube-proxy-t777l                    1/1     Running   5          2d9h    192.168.237.132   k8snode2    <none>           <none>
+        kube-system   kube-scheduler-k8smaster            1/1     Running   4          2d18h   192.168.237.130   k8smaster   <none>           <none>
+
+
+        # 调整nginx-deployment.yaml，指定在label属性qwer=zxc的节点上部署
+        [root@k8smaster ~]# cat nginx-deployment.yaml
+        apiVersion: apps/v1     #与k8s集群版本有关，使用 kubectl api-versions 即可查看当前集群支持的版本
+        kind: Deployment        #该配置的类型，我们使用的是 Deployment
+        metadata:               #译名为元数据，即 Deployment 的一些基本属性和信息
+          name: nginx-deployment        #Deployment 的名称
+          labels:           #标签，可以灵活定位一个或多个资源，其中key和value均可自定义，可以定义多组，目前不需要理解
+            app: nginx  #为该Deployment设置key为app，value为nginx的标签
+        spec:           #这是关于该Deployment的描述，可以理解为你期待该Deployment在k8s中如何使用
+          replicas: 1   #使用该Deployment创建一个应用程序实例
+          selector:         #标签选择器，与上面的标签共同作用，目前不需要理解
+            matchLabels: #选择包含标签app:nginx的资源
+              app: nginx
+          template:         #这是选择或创建的Pod的模板
+            metadata:   #Pod的元数据
+              labels:   #Pod的标签，上面的selector即选择包含标签app:nginx的Pod
+                app: nginx
+            spec:           #期望Pod实现的功能（即在pod中部署）
+              containers:       #生成container，与docker中的container是同一种
+              - name: nginx     #container的名称
+                image: registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx:0.1 #使用阿里云私有镜像拉取0.1版本的m_nginx创建container，该container默认80端口可访问
+                imagePullPolicy: IfNotPresent   # Always: 总是pull；IfNotPresent: 本地有使用本地，没有的话pull；Never: 只使用本地镜像
+              imagePullSecrets:
+              - name: k8s-docker-secret
+              nodeSelector:
+                qwer: zxc # 选择node节点中label属性qwer=zxc的节点部署
+
+        # label后第一次部署
+        [root@k8smaster ~]# kubectl apply -f nginx-deployment.yaml
+        deployment.apps/nginx-deployment created
+        [root@k8smaster ~]# kubectl get pods -o wide
+        NAME                              READY   STATUS    RESTARTS   AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+        nginx-deployment-bd45d58d-lc448   1/1     Running   0          27s   10.244.1.17   k8snode1   <none>           <none>
+        # label后第二次部署
+        [root@k8smaster ~]# kubectl delete -f nginx-deployment.yaml
+        deployment.apps "nginx-deployment" deleted
+        [root@k8smaster ~]# kubectl apply -f nginx-deployment.yaml
+        deployment.apps/nginx-deployment created
+        [root@k8smaster ~]# kubectl get pods -o wide
+        NAME                              READY   STATUS    RESTARTS   AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+        nginx-deployment-bd45d58d-p2nwn   1/1     Running   0          3s    10.244.1.18   k8snode1   <none>           <none>
+        # label后第三次部署，这次使用replace的方式部署
+        [root@k8smaster ~]# kubectl replace --force -f nginx-deployment.yaml
+        deployment.apps "nginx-deployment" deleted
+        deployment.apps/nginx-deployment replaced
+        [root@k8smaster ~]# kubectl get pods -o wide
+        NAME                                READY   STATUS    RESTARTS   AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+        nginx-deployment-6ffc58c969-fhfdl   1/1     Running   0          11s   10.244.1.19   k8snode1   <none>           <none>
+        [root@k8smaster ~]#
+
+        # 结论，全部都部署在k8snode1上，因为之前在K8snode1的label上添加了qwer=zxc的属性
+
+        # 删除label指定属性
+        [root@k8smaster ~]# kubectl get nodes --show-labels
+        NAME        STATUS   ROLES    AGE     VERSION   LABELS
+        k8smaster   Ready    master   2d21h   v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8smaster,kubernetes.io/os=linux,node-role.kubernetes.io/master=
+        k8snode1    Ready    <none>   2d13h   v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8snode1,kubernetes.io/os=linux,qwer=zxc
+        k8snode2    Ready    <none>   2d13h   v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8snode2,kubernetes.io/os=linux,qwer=abc
+        [root@k8smaster ~]# kubectl label node k8snode2 qwer-
+        node/k8snode2 labeled
+        [root@k8smaster ~]# kubectl get nodes --show-labels
+        NAME        STATUS   ROLES    AGE     VERSION   LABELS
+        k8smaster   Ready    master   2d21h   v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8smaster,kubernetes.io/os=linux,node-role.kubernetes.io/master=
+        k8snode1    Ready    <none>   2d13h   v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8snode1,kubernetes.io/os=linux,qwer=zxc
+        k8snode2    Ready    <none>   2d13h   v1.16.2   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8snode2,kubernetes.io/os=linux
+        [root@k8smaster ~]#
+
+
+    4、创建NodePort类型的service，外网访问业务应用
+        注：pod部署的应用，每次可能部署在不同node的不同ip，目前只能通过Pod所在Node节点的内网IP（flannel）来访问，通过service可以让pod应用暴露出来
+
+        # 查看刚刚部署的nginx程序的labels
+        [root@k8smaster ~]# kubectl get pods -o wide --show-labels
+        NAME                                READY   STATUS    RESTARTS   AGE     IP            NODE       NOMINATED NODE   READINESS GATES   LABELS
+        nginx-deployment-6ffc58c969-fhfdl   1/1     Running   0          4h26m   10.244.1.19   k8snode1   <none>           <none>            app=nginx,pod-template-hash=6ffc58c969
+
+        # 使用 nginx-svc.yaml 创建service
+        [root@k8smaster ~]# cat nginx-svc.yaml
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: nginx
+        spec:
+          type: NodePort # 指定NodePort
+          ports:
+            - port: 80 # 这个端口与pod在node节点上的端口必须保持一致
+              nodePort : 31234 # 暴露给外界的端口，如果没有当前属性，则随机生成端口，范围30000-32767
+          selector:
+            app: nginx # 与pod的label一致
+        [root@k8smaster ~]# kubectl apply -f nginx-svc.yaml
+        service/nginx created
+
+        # 查看services type=ClusterIP的CLUSTER-IP为虚拟IP，每个节点都ping不通
+        [root@k8smaster ~]# kubectl get services -o wide
+        NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE     SELECTOR
+        kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP        2d22h   <none>
+        nginx        NodePort    10.107.22.14   <none>        80:31234/TCP   5s      app=nginx
+
+        # 查看刚刚创建的nginx service的详情
+        [root@k8smaster ~]# kubectl describe service nginx
+        Name:                     nginx
+        Namespace:                default
+        Labels:                   <none>
+        Annotations:              kubectl.kubernetes.io/last-applied-configuration:
+                                   {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"name":"nginx","namespace":"default"},"spec":{"ports":[{"nodePort":31234,...
+        Selector:                 app=nginx
+        Type:                     NodePort
+        IP:                       10.107.22.14
+        Port:                     <unset>  80/TCP
+        TargetPort:               80/TCP
+        NodePort:                 <unset>  31234/TCP
+        Endpoints:                10.244.1.19:80
+        Session Affinity:         None
+        External Traffic Policy:  Cluster
+        Events:                   <none>
+
+        # 访问应用的几种方式：
+            # pod
+            [root@k8smaster ~]# kubectl get pods -o wide
+            NAME                                READY   STATUS    RESTARTS   AGE    IP            NODE       NOMINATED NODE   READINESS GATES
+            nginx-deployment-6ffc58c969-fhfdl   1/1     Running   0          4h2m   10.244.1.19   k8snode1   <none>           <none>
+
+            # service
+            [root@k8smaster ~]# kubectl get service -o wide
+            NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE     SELECTOR
+            kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP        2d22h   <none>
+            nginx        NodePort    10.107.22.14   <none>        80:31234/TCP   10m     app=nginx
+
+        # 1、在POD部署的Node节点上，通过POD ip:port的方式访问
+            # ×××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××
+            [root@k8smaster ~]# curl 10.244.1.19:80
+            curl: (7) Failed connect to 10.244.1.19:80; Connection timed out
+            # ×××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××
+            [root@k8snode2 ~]# curl 10.244.1.19:80
+            curl: (7) Failed connect to 10.244.1.19:80; Connection timed out
+            # √√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√
+            [root@k8snode1 ~]# curl 10.244.1.19:80
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <title>Welcome to nginx!</title>
+            </head>
+            <body>
+            <h1>Welcome to nginx!</h1>
+            <p>If you see this page, the nginx web server is successfully installed and
+            working. Further configuration is required.</p>
+
+            <p>For online documentation and support please refer to
+            <a href="http://nginx.org/">nginx.org</a>.<br/>
+            Commercial support is available at
+            <a href="http://nginx.com/">nginx.com</a>.</p>
+
+            <p><em>Thank you for using nginx.</em></p>
+            </body>
+            </html>
+
+        # 2、在POD部署的Node节点上，通过service（type=NodePort）的 Cluster IP: TargetPort 访问
+            # ×××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××
+            [root@k8smaster ~]# curl 10.107.22.14:80
+            curl: (7) Failed connect to 10.107.22.14:80; Connection timed out
+            # ×××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××××
+            [root@k8snode2 ~]# curl 10.107.22.14:80
+            curl: (7) Failed connect to 10.107.22.14:80; Connection timed out
+            # √√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√
+            [root@k8snode1 ~]# curl 10.107.22.14:80
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <title>Welcome to nginx!</title>
+            <style>
+                body {
+                    width: 35em;
+                    margin: 0 auto;
+                    font-family: Tahoma, Verdana, Arial, sans-serif;
+                }
+            </style>
+            </head>
+            <body>
+            <h1>Welcome to nginx!</h1>
+            <p>If you see this page, the nginx web server is successfully installed and
+            working. Further configuration is required.</p>
+
+            <p>For online documentation and support please refer to
+            <a href="http://nginx.org/">nginx.org</a>.<br/>
+            Commercial support is available at
+            <a href="http://nginx.com/">nginx.com</a>.</p>
+
+            <p><em>Thank you for using nginx.</em></p>
+            </body>
+            </html>
+
+        # 3、在任意节点上，通过POD部署节点的IP:nodePort访问
+            # √√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√
+            [root@k8smaster ~]# curl k8snode1:31234
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <title>Welcome to nginx!</title>
+            <style>
+                body {
+                    width: 35em;
+                    margin: 0 auto;
+                    font-family: Tahoma, Verdana, Arial, sans-serif;
+                }
+            </style>
+            </head>
+            <body>
+            <h1>Welcome to nginx!</h1>
+            <p>If you see this page, the nginx web server is successfully installed and
+            working. Further configuration is required.</p>
+
+            <p>For online documentation and support please refer to
+            <a href="http://nginx.org/">nginx.org</a>.<br/>
+            Commercial support is available at
+            <a href="http://nginx.com/">nginx.com</a>.</p>
+
+            <p><em>Thank you for using nginx.</em></p>
+            </body>
+            </html>
+            # √√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√
+            [root@k8snode1 ~]# curl k8snode1:31234
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <title>Welcome to nginx!</title>
+            <style>
+                body {
+                    width: 35em;
+                    margin: 0 auto;
+                    font-family: Tahoma, Verdana, Arial, sans-serif;
+                }
+            </style>
+            </head>
+            <body>
+            <h1>Welcome to nginx!</h1>
+            <p>If you see this page, the nginx web server is successfully installed and
+            working. Further configuration is required.</p>
+
+            <p>For online documentation and support please refer to
+            <a href="http://nginx.org/">nginx.org</a>.<br/>
+            Commercial support is available at
+            <a href="http://nginx.com/">nginx.com</a>.</p>
+
+            <p><em>Thank you for using nginx.</em></p>
+            </body>
+            </html>
+            # √√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√√
+            [root@k8snode2 ~]# curl k8snode1:31234
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <title>Welcome to nginx!</title>
+            <style>
+                body {
+                    width: 35em;
+                    margin: 0 auto;
+                    font-family: Tahoma, Verdana, Arial, sans-serif;
+                }
+            </style>
+            </head>
+            <body>
+            <h1>Welcome to nginx!</h1>
+            <p>If you see this page, the nginx web server is successfully installed and
+            working. Further configuration is required.</p>
+
+            <p>For online documentation and support please refer to
+            <a href="http://nginx.org/">nginx.org</a>.<br/>
+            Commercial support is available at
+            <a href="http://nginx.com/">nginx.com</a>.</p>
+
+            <p><em>Thank you for using nginx.</em></p>
+            </body>
+            </html>
+
+
+        # 查看 deployments service pod 详细信息
+        [root@k8smaster ~]# kubectl get deployments -o wide
+        NAME               READY   UP-TO-DATE   AVAILABLE   AGE     CONTAINERS   IMAGES                                                         SELECTOR
+        nginx-deployment   1/1     1            1           4h28m   nginx        registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx:0.1   app=nginx
+        [root@k8smaster ~]# kubectl describe deployments.apps nginx-deployment
+        Name:                   nginx-deployment
+        Namespace:              default
+        CreationTimestamp:      Tue, 19 Nov 2019 19:19:03 +0800
+        Labels:                 app=nginx
+        Annotations:            deployment.kubernetes.io/revision: 1
+        Selector:               app=nginx
+        Replicas:               1 desired | 1 updated | 1 total | 1 available | 0 unavailable
+        StrategyType:           RollingUpdate
+        MinReadySeconds:        0
+        RollingUpdateStrategy:  25% max unavailable, 25% max surge
+        Pod Template:
+          Labels:  app=nginx
+          Containers:
+           nginx:
+            Image:        registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx:0.1
+            Port:         <none>
+            Host Port:    <none>
+            Environment:  <none>
+            Mounts:       <none>
+          Volumes:        <none>
+        Conditions:
+          Type           Status  Reason
+          ----           ------  ------
+          Available      True    MinimumReplicasAvailable
+          Progressing    True    NewReplicaSetAvailable
+        OldReplicaSets:  <none>
+        NewReplicaSet:   nginx-deployment-6ffc58c969 (1/1 replicas created)
+        Events:          <none>
+
+        [root@k8smaster ~]# kubectl get services -o wide
+        NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE     SELECTOR
+        kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP        2d23h   <none>
+        nginx        NodePort    10.105.152.75   <none>        80:31234/TCP   29s     app=nginx
+        [root@k8smaster ~]# kubectl describe service nginx
+        Name:                     nginx
+        Namespace:                default
+        Labels:                   <none>
+        Annotations:              kubectl.kubernetes.io/last-applied-configuration:
+                                    {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"name":"nginx","namespace":"default"},"spec":{"ports":[{"nodePort":31234,...
+        Selector:                 app=nginx
+        Type:                     NodePort
+        IP:                       10.105.152.75
+        Port:                     <unset>  80/TCP
+        TargetPort:               80/TCP
+        NodePort:                 <unset>  31234/TCP
+        Endpoints:                10.244.1.19:80
+        Session Affinity:         None
+        External Traffic Policy:  Cluster
+        Events:                   <none>
+
+        [root@k8smaster ~]# kubectl get pods -o wide --show-labels
+        NAME                                READY   STATUS    RESTARTS   AGE     IP            NODE       NOMINATED NODE   READINESS GATES   LABELS
+        nginx-deployment-6ffc58c969-fhfdl   1/1     Running   0          4h29m   10.244.1.19   k8snode1   <none>           <none>            app=nginx,pod-template-hash=6ffc58c969
+        [root@k8smaster ~]# kubectl describe pod nginx-deployment-6ffc58c969-fhfdl
+        Name:         nginx-deployment-6ffc58c969-fhfdl
+        Namespace:    default
+        Priority:     0
+        Node:         k8snode1/192.168.237.131
+        Start Time:   Tue, 19 Nov 2019 19:17:12 +0800
+        Labels:       app=nginx
+                      pod-template-hash=6ffc58c969
+        Annotations:  <none>
+        Status:       Running
+        IP:           10.244.1.19
+        IPs:
+          IP:           10.244.1.19
+        Controlled By:  ReplicaSet/nginx-deployment-6ffc58c969
+        Containers:
+          nginx:
+            Container ID:   docker://c11a248405363b784ba2684a98445253a74cf420e77955d73f942ea631b2358c
+            Image:          registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx:0.1
+            Image ID:       docker-pullable://registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx@sha256:f56b43e9913cef097f246d65119df4eda1d61670f7f2ab720831a01f66f6ff9c
+            Port:           <none>
+            Host Port:      <none>
+            State:          Running
+              Started:      Tue, 19 Nov 2019 19:17:12 +0800
+            Ready:          True
+            Restart Count:  0
+            Environment:    <none>
+            Mounts:
+              /var/run/secrets/kubernetes.io/serviceaccount from default-token-f2tm6 (ro)
+        Conditions:
+          Type              Status
+          Initialized       True
+          Ready             True
+          ContainersReady   True
+          PodScheduled      True
+        Volumes:
+          default-token-f2tm6:
+            Type:        Secret (a volume populated by a Secret)
+            SecretName:  default-token-f2tm6
+            Optional:    false
+        QoS Class:       BestEffort
+        Node-Selectors:  qwer=zxc
+        Tolerations:     node.kubernetes.io/not-ready:NoExecute for 300s
+                         node.kubernetes.io/unreachable:NoExecute for 300s
+        Events:          <none>
+
+    5、测试ClusterIP
+        # 创建3个副本（可以超过node节点的个数）
+        [root@k8smaster ~]# cat nginx-deployment-cluster.yaml
+        apiVersion: apps/v1     #与k8s集群版本有关，使用 kubectl api-versions 即可查看当前集群支持的版本
+        kind: Deployment        #该配置的类型，我们使用的是 Deployment
+        metadata:               #译名为元数据，即 Deployment 的一些基本属性和信息
+          name: nginx-deployment        #Deployment 的名称
+          labels:           #标签，可以灵活定位一个或多个资源，其中key和value均可自定义，可以定义多组，目前不需要理解
+            app: nginx  #为该Deployment设置key为app，value为nginx的标签
+        spec:           #这是关于该Deployment的描述，可以理解为你期待该Deployment在k8s中如何使用
+          replicas: 3   #使用该Deployment创建一个应用程序实例
+          selector:         #标签选择器，与上面的标签共同作用，目前不需要理解
+            matchLabels: #选择包含标签app:nginx的资源
+              app: nginx
+          template:         #这是选择或创建的Pod的模板
+            metadata:   #Pod的元数据
+              labels:   #Pod的标签，上面的selector即选择包含标签app:nginx的Pod
+                app: nginx
+            spec:           #期望Pod实现的功能（即在pod中部署）
+              containers:       #生成container，与docker中的container是同一种
+              - name: nginx     #container的名称
+                image: registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx:0.1 #使用阿里云私有镜像拉取0.1版本的m_nginx创建container，该container默认80端口可访问
+                imagePullPolicy: IfNotPresent   # Always: 总是pull；IfNotPresent: 本地有使用本地，没有的话pull；Never: 只使用本地镜像
+              imagePullSecrets:
+              - name: k8s-docker-secret
+              nodeSelector:
+                # qwer: zxc # 选择node节点中label属性qwer=zxc的节点部署
+
+        # 创建类型为ClusterIP类型的service
+        [root@k8smaster ~]# cat nginx-svc-clusterip.yaml
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: nginx
+        spec:
+          type: ClusterIP # 测试ClusterIp
+          ports:
+            - port: 80 # 这个端口与pod在node节点上的端口必须保持一致
+              # nodePort : 31234 # 暴露给外界的端口，如果没有当前属性，则随机生成端口，范围30000-32767
+          selector:
+            app: nginx
+
+        # 部署pod和service
+        [root@k8smaster ~]# kubectl apply -f nginx-deployment-cluster.yaml
+        deployment.apps/nginx-deployment created
+        [root@k8smaster ~]# kubectl apply -f nginx-svc-clusterip.yaml
+        service/nginx created
+
+        # 查看三个pod
+        [root@k8smaster ~]# kubectl get pods -o wide
+        NAME                                READY   STATUS    RESTARTS   AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+        nginx-deployment-6f68986c79-4kdc7   1/1     Running   0          32s   10.244.1.26   k8snode1   <none>           <none>
+        nginx-deployment-6f68986c79-btkf8   1/1     Running   0          32s   10.244.2.23   k8snode2   <none>           <none>
+        nginx-deployment-6f68986c79-qjrn8   1/1     Running   0          32s   10.244.1.27   k8snode1   <none>           <none>
+
+        # 查看service
+        [root@k8smaster ~]# kubectl get services -o wide
+        NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE     SELECTOR
+        kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP   2d23h   <none>
+        nginx        ClusterIP   10.111.129.80   <none>        80/TCP    67s     app=nginx
+
+        # 通过portip+port的方式在对应的node节点上都可以访问
+        # 通过clusterip+port的方式在所有的节点上都访问不了
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+五、安装Ingress
+    1、部署nginx-ingress-controller
+        [root@k8smaster ~]# wget https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/mandatory.yaml
+        [root@k8smaster ~]# cp mandatory.yaml ingress_nginx.yaml
+        # 调整ingress.yaml
+        # 216 行添加 hostNetwork: true # added 使用宿主机网络
+        # 222 行修改 image: registry.aliyuncs.com/google_containers/nginx-ingress-controller:0.26.1
+        [root@k8smaster ~]# kubectl apply -f ingress.yaml
+
+        # 等待部署完成
+        [root@k8smaster ~]# kubectl get pods -A -o wide
+        NAMESPACE       NAME                                        READY   STATUS    RESTARTS   AGE     IP                NODE        NOMINATED NODE   READINESS GATES
+        default         nginx-deployment-bd45d58d-jnb6n             1/1     Running   1          48m     10.244.1.30       k8snode1    <none>           <none>
+        ingress-nginx   nginx-ingress-controller-5cd8ff9d6f-v8z78   1/1     Running   0          3m46s   192.168.237.132   k8snode2    <none>           <none>
+        kube-system     coredns-58cc8c89f4-s4k8n                    1/1     Running   5          3d      10.244.0.11       k8smaster   <none>           <none>
+        kube-system     coredns-58cc8c89f4-v642x                    1/1     Running   4          2d15h   10.244.0.12       k8smaster   <none>           <none>
+        kube-system     etcd-k8smaster                              1/1     Running   5          3d      192.168.237.130   k8smaster   <none>           <none>
+        kube-system     kube-apiserver-k8smaster                    1/1     Running   5          3d      192.168.237.130   k8smaster   <none>           <none>
+        kube-system     kube-controller-manager-k8smaster           1/1     Running   5          3d      192.168.237.130   k8smaster   <none>           <none>
+        kube-system     kube-flannel-ds-amd64-nbbnt                 1/1     Running   7          3d      192.168.237.130   k8smaster   <none>           <none>
+        kube-system     kube-flannel-ds-amd64-zgf8j                 1/1     Running   6          2d15h   192.168.237.131   k8snode1    <none>           <none>
+        kube-system     kube-flannel-ds-amd64-ztq29                 1/1     Running   5          2d15h   192.168.237.132   k8snode2    <none>           <none>
+        kube-system     kube-proxy-c9nxm                            1/1     Running   5          3d      192.168.237.130   k8smaster   <none>           <none>
+        kube-system     kube-proxy-kxcwm                            1/1     Running   5          2d15h   192.168.237.131   k8snode1    <none>           <none>
+        kube-system     kube-proxy-t777l                            1/1     Running   5          2d15h   192.168.237.132   k8snode2    <none>           <none>
+        kube-system     kube-scheduler-k8smaster                    1/1     Running   5          3d      192.168.237.130   k8smaster   <none>           <none>
+
+    2、部署 ingress_nginx 服务
+        [root@k8smaster ~]# cat ingress_nginx_service.yaml
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: ingress-nginx
+          namespace: ingress-nginx
+          labels:
+            app.kubernetes.io/name: ingress-nginx
+            app.kubernetes.io/part-of: ingress-nginx
+        spec:
+          type: NodePort
+          ports:
+            - name: http
+              port: 80
+              targetPort: 80
+              protocol: TCP
+              nodePort: 32080  #http
+            - name: https
+              port: 443
+              targetPort: 443
+              protocol: TCP
+              nodePort: 32443  #https
+          selector:
+            app.kubernetes.io/name: ingress-nginx
+            app.kubernetes.io/part-of: ingress-nginx
+        [root@k8smaster ~]# kubectl apply -f ingress_nginx_service.yaml
+        service/ingress-nginx created
+        [root@k8smaster ~]# kubectl get services -A -o wide
+        NAMESPACE       NAME            TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE   SELECTOR
+        default         kubernetes      ClusterIP   10.96.0.1        <none>        443/TCP                      3d    <none>
+        default         nginx           NodePort    10.110.167.219   <none>        80:31234/TCP                 51m   app=nginx
+        ingress-nginx   ingress-nginx   NodePort    10.106.164.130   <none>        80:32080/TCP,443:32443/TCP   5s    app.kubernetes.io/name=ingress-nginx,app.kubernetes.io/part-of=ingress-nginx
+        kube-system     kube-dns        ClusterIP   10.96.0.10       <none>        53/UDP,53/TCP,9153/TCP       3d    k8s-app=kube-dns
+
+    3、新增tomcat应用，映射到ingress
+        [root@k8smaster ~]# cat tomcat-deploy.yaml
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: tomcat
+          namespace: default
+        spec:
+          selector:
+            app: tomcat
+            release: canary
+          ports:
+          - name: http
+            port: 8080
+            targetPort: 8080
+          - name: ajp
+            port: 8009
+            targetPort: 8009
+
+        ---
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: tomcat-deploy
+        spec:
+          replicas: 3
+          selector:
+            matchLabels:
+              app: tomcat
+              release: canary
+          template:
+            metadata:
+              labels:
+                app: tomcat
+                release: canary
+            spec:
+              containers:
+              - name: tomcat
+                image: tomcat:7-alpine
+                ports:
+                - name: httpd
+                  containerPort: 8080
+                - name: ajp
+                  containerPort: 8009
+
+        [root@k8smaster ~]# kubectl apply -f tomcat-deploy.yaml
+        service/tomcat created
+        deployment.apps/tomcat-deploy created
+
+        [root@k8smaster ~]# kubectl get pods -o wide
+        NAME                              READY   STATUS    RESTARTS   AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+        nginx-deployment-bd45d58d-jnb6n   1/1     Running   1          59m   10.244.1.30   k8snode1   <none>           <none>
+        tomcat-deploy-8568f7b598-85lm2    1/1     Running   0          36s   10.244.1.32   k8snode1   <none>           <none>
+        tomcat-deploy-8568f7b598-ggxg5    1/1     Running   0          36s   10.244.1.31   k8snode1   <none>           <none>
+        tomcat-deploy-8568f7b598-pd4k8    1/1     Running   0          36s   10.244.2.27   k8snode2   <none>           <none>
+
+        # 将tomcat应用添加到ingress-nginx中
+        [root@k8smaster ~]# cat ingress_tomcat.yaml
+        apiVersion: extensions/v1beta1
+        kind: Ingress
+        metadata:
+          name: ingress-tomcat
+          namespace: default
+          annotations:
+            kubernets.io/ingress.class: "nginx"
+        spec:
+          rules:
+          - host: tomcat.ingress.com
+            http:
+              paths:
+              - path:
+                backend:
+                  serviceName: tomcat
+                  servicePort: 8080
+
+        [root@k8smaster ~]# kubectl apply -f ingress_tomcat.yaml
+        ingress.extensions/ingress-tomcat created
+
+        # 进入 ingress—nginx 容器 查看nginx.conf
+        [root@k8smaster ~]# kubectl exec -n ingress-nginx  -it nginx-ingress-controller-5cd8ff9d6f-v8z78 bash
+        www-data@k8snode2:/etc/nginx$ cat nginx.conf
+
+        # Configuration checksum: 5550615459557406209
+
+        # setup custom paths that do not require root access
+        pid /tmp/nginx.pid;
+        daemon off;
+        worker_processes 2;
+        worker_rlimit_nofile 523264;
+        worker_shutdown_timeout 240s ;
+        events {
+        	multi_accept        on;
+        	worker_connections  16384;
+        	use                 epoll;
+        }
+        http {
+            ......
+        	## start server tomcat.ingress.com
+        	server {
+        		server_name tomcat.ingress.com ;
+        		listen 80  ;
+        		listen [::]:80  ;
+        		listen 443  ssl http2 ;
+        		listen [::]:443  ssl http2 ;
+        		set $proxy_upstream_name "-";
+        		ssl_certificate_by_lua_block {
+        			certificate.call()
+        		}
+        		location / {
+        			set $namespace      "default";
+        			set $ingress_name   "ingress-tomcat";
+        			set $service_name   "tomcat";
+        			set $service_port   "8080";
+        			set $location_path  "/";
+        			rewrite_by_lua_block {
+        				lua_ingress.rewrite({
+        					force_ssl_redirect = false,
+        					ssl_redirect = true,
+        					force_no_ssl_redirect = false,
+        					use_port_in_redirects = false,
+        				})
+        				balancer.rewrite()
+        				plugins.run()
+        			}
+        			header_filter_by_lua_block {
+        				plugins.run()
+        			}
+        			body_filter_by_lua_block {
+        			}
+        			log_by_lua_block {
+        				balancer.log()
+        				monitor.call()
+        				plugins.run()
+        			}
+        			port_in_redirect off;
+        			set $balancer_ewma_score -1;
+        			set $proxy_upstream_name "default-tomcat-8080";
+        			set $proxy_host          $proxy_upstream_name;
+        			set $pass_access_scheme  $scheme;
+        			set $pass_server_port    $server_port;
+        			set $best_http_host      $http_host;
+        			set $pass_port           $pass_server_port;
+        			set $proxy_alternative_upstream_name "";
+        			client_max_body_size                    1m;
+        			proxy_set_header Host                   $best_http_host;
+        			# Pass the extracted client certificate to the backend
+        			# Allow websocket connections
+        			proxy_set_header                        Upgrade           $http_upgrade;
+        			proxy_set_header                        Connection        $connection_upgrade;
+        			proxy_set_header X-Request-ID           $req_id;
+        			proxy_set_header X-Real-IP              $remote_addr;
+        			proxy_set_header X-Forwarded-For        $remote_addr;
+        			proxy_set_header X-Forwarded-Host       $best_http_host;
+        			proxy_set_header X-Forwarded-Port       $pass_port;
+        			proxy_set_header X-Forwarded-Proto      $pass_access_scheme;
+        			proxy_set_header X-Scheme               $pass_access_scheme;
+        			# Pass the original X-Forwarded-For
+        			proxy_set_header X-Original-Forwarded-For $http_x_forwarded_for;
+        			# mitigate HTTPoxy Vulnerability
+        			# https://www.nginx.com/blog/mitigating-the-httpoxy-vulnerability-with-nginx/
+        			proxy_set_header Proxy                  "";
+        			# Custom headers to proxied server
+        			proxy_connect_timeout                   5s;
+        			proxy_send_timeout                      60s;
+        			proxy_read_timeout                      60s;
+        			proxy_buffering                         off;
+        			proxy_buffer_size                       4k;
+        			proxy_buffers                           4 4k;
+        			proxy_max_temp_file_size                1024m;
+        			proxy_request_buffering                 on;
+        			proxy_http_version                      1.1;
+        			proxy_cookie_domain                     off;
+        			proxy_cookie_path                       off;
+        			# In case of errors try the next upstream server before returning an error
+        			proxy_next_upstream                     error timeout;
+        			proxy_next_upstream_timeout             0;
+        			proxy_next_upstream_tries               3;
+        			proxy_pass http://upstream_balancer;
+        			proxy_redirect                          off;
+        		}
+        	}
+        	## end server tomcat.ingress.com
+        	......
+        }
+
+        stream {
+        	......
+        }
+
+        www-data@k8snode2:/etc/nginx$
+
+        # k8smaster 访问tomcat
+        [root@k8smaster ~]# cat /etc/hosts
+            127.0.0.1   localhost localhost.localdomain localhost4 localhost
+            127.0.0.1 localhost4.localdomain4
+            ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+            192.168.237.130	tomcat.ingress.com
+
+        [root@k8smaster ~]# curl tomcat.ingress.com:32080
+            <!DOCTYPE html>
+            <html lang="en">
+                <head>
+                    <title>Apache Tomcat/7.0.94</title>
+                    <link href="favicon.ico" rel="icon" type="image/x-icon" />
+                    <link href="favicon.ico" rel="shortcut icon" type="image/x-icon" />
+                    <link href="tomcat.css" rel="stylesheet" type="text/css" />
+                </head>
+                <body>
+                ......
+                </body>
+            </html>
+
+
+        # k8snode1 访问tomcat
+        [root@k8snode1 ~]# cat /etc/hosts
+            127.0.0.1   localhost localhost.localdomain localhost4 localhost
+            127.0.0.1 localhost4.localdomain4
+            ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+            192.168.237.130	k8smaster
+            192.168.237.131	k8snode1
+            192.168.237.132	k8snode2
+
+            #测试ingress部署的tomcat
+            192.168.237.131	tomcat.ingress.com
+
+        [root@k8smaster ~]# curl tomcat.ingress.com:32080
+            <!DOCTYPE html>
+            <html lang="en">
+                <head>
+                    <title>Apache Tomcat/7.0.94</title>
+                    <link href="favicon.ico" rel="icon" type="image/x-icon" />
+                    <link href="favicon.ico" rel="shortcut icon" type="image/x-icon" />
+                    <link href="tomcat.css" rel="stylesheet" type="text/css" />
+                </head>
+                <body>
+                ......
+                </body>
+            </html>
+
+        # k8snode2 访问tomcat
+        [root@k8snode2 ~]# cat /etc/hosts
+            127.0.0.1   localhost localhost.localdomain localhost4 localhost
+            127.0.0.1 localhost4.localdomain4
+            ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+            192.168.237.130	k8smaster
+            192.168.237.131	k8snode1
+            192.168.237.132	k8snode2
+
+            #测试ingress部署的tomcat
+            192.168.237.132	tomcat.ingress.com
+
+        [root@k8smaster ~]# curl tomcat.ingress.com:32080
+            <!DOCTYPE html>
+            <html lang="en">
+                <head>
+                    <title>Apache Tomcat/7.0.94</title>
+                    <link href="favicon.ico" rel="icon" type="image/x-icon" />
+                    <link href="favicon.ico" rel="shortcut icon" type="image/x-icon" />
+                    <link href="tomcat.css" rel="stylesheet" type="text/css" />
+                </head>
+                <body>
+                ......
+                </body>
+            </html>
+
+        # windows主机访问
+
+            # 添加k8smaster的hosts
+            C:\Windows\System32\drivers\etc\hosts 添加:
+            192.168.237.130 tomcat.ingress.com
+
+            # curl 访问
+            mirana@mirana MINGW64 ~
+            $ curl tomcat.ingress.com:32080
+              % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                             Dload  Upload   Total   Spent    Left  Speed
+            100  1252    0  1252    0     0    124      0 --:--:--  0:00:10 --:--:--   260
+            <!DOCTYPE html>
+            <html lang="en">
+                <head>
+                    <title>Apache Tomcat/7.0.94</title>
+                    <link href="favicon.ico" rel="icon" type="image/x-icon" />
+                    <link href="favicon.ico" rel="shortcut icon" type="image/x-icon" />
+                    <link href="tomcat.css" rel="stylesheet" type="text/css" />
+                </head>
+                <body>
+                    ......
+                </body>
+            </html>
+
+
+
+
+
+
+
+dashboard
+    # 下载k8s-dashboard.yaml
+    [root@k8smaster ~]# wget https://raw.githubuserNodePort.com/kubernetes/dashboard/v1.10.1/src/deploy/recommended/kubernetes-dashboard.yaml
+    --2019-11-17 20:52:34--  https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.1/src/deploy/recommended/kubernetes-dashboard.yaml
+    Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 151.101.108.133
+    Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|151.101.108.133|:443... connected.
+    HTTP request sent, awaiting response... 200 OK
+    Length: 4577 (4.5K) [text/plain]
+    Saving to: ‘kubernetes-dashboard.yaml’
+
+    100%[========================================================================================================================================================================>] 4,577       28.0KB/s   in 0.2s
+
+    2019-11-17 20:52:39 (28.0 KB/s) - ‘kubernetes-dashboard.yaml’ saved [4577/4577]
+
+    # 修改 kubernetes-dashboard.yaml 的docker镜像地址
+    # ------------------- Dashboard Deployment ------------------- #
+    找到spec.template.spec.containers.image，调整为
+        image: registry.aliyuncs.com/google_containers/kubernetes-dashboard-amd64:v1.10.1
+    # ------------------- Dashboard Service -------------------
+    在spec下新增
+        type: NodePort

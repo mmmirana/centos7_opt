@@ -1,0 +1,485 @@
+参考
+1、安装 docerk、kubectl、kubeadm、kubelet
+[root@k8s-msater ~]curl -sSL https://kuboard.cn/install-script/v1.16.2/install_kubelet.sh | sh
+[root@k8s-node1 ~]curl -sSL https://kuboard.cn/install-script/v1.16.2/install_kubelet.sh | sh
+[root@k8s-node2 ~]curl -sSL https://kuboard.cn/install-script/v1.16.2/install_kubelet.sh | sh
+
+kubectl 命令自动补全
+[root@k8s-master ~]# yum install -y bash-completion
+[root@k8s-master ~]# source /usr/share/bash-completion/bash_completion
+[root@k8s-master ~]# source <(kubectl completion bash)
+[root@k8s-master ~]# echo "source <(kubectl completion bash)" >> ~/.bashrc
+
+
+2、master节点使用kubeadm安装k8s，网络插件使用calico
+[root@k8s-master ~]# export MASTER_IP=192.168.237.140
+[root@k8s-master ~]# export APISERVER_NAME=apiserver.demo
+[root@k8s-master ~]# export POD_SUBNET=10.100.0.1/16
+[root@k8s-master ~]# echo "${MASTER_IP} ${APISERVER_NAME}" >> /etc/hosts
+[root@k8s-master ~]# cat /etc/hosts
+127.0.0.1   localhost localhost.localdomain localhost4 localhost
+127.0.0.1 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+192.168.237.140	k8s-master
+192.168.237.141	k8s-node1
+192.168.237.142	k8s-node2
+
+192.168.237.140    apiserver.demo
+
+[root@k8s-master ~]# curl -sSL https://kuboard.cn/install-script/v1.16.2/init_master.sh | sh
+
+# 等待部署完成
+[root@k8s-master ~]# kubectl get pods -A -o wide
+NAMESPACE     NAME                                      READY   STATUS    RESTARTS   AGE     IP                NODE         NOMINATED NODE   READINESS GATES
+kube-system   calico-kube-controllers-dc6cb64cb-gl4vs   1/1     Running   0          2m32s   10.100.235.193    k8s-master   <none>           <none>
+kube-system   calico-node-z7cs5                         1/1     Running   0          2m32s   192.168.237.140   k8s-master   <none>           <none>
+kube-system   coredns-67c766df46-cjrhq                  1/1     Running   0          2m32s   10.100.235.194    k8s-master   <none>           <none>
+kube-system   coredns-67c766df46-zww4m                  1/1     Running   0          2m28s   10.100.235.195    k8s-master   <none>           <none>
+kube-system   etcd-k8s-master                           1/1     Running   1          8m40s   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-apiserver-k8s-master                 1/1     Running   1          8m40s   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-controller-manager-k8s-master        1/1     Running   5          9m26s   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-proxy-8x5hm                          1/1     Running   0          2m32s   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-scheduler-k8s-master                 1/1     Running   3          8m31s   192.168.237.140   k8s-master   <none>           <none>
+[root@k8s-master ~]# kubectl get nodes -A -o wide
+NAME         STATUS   ROLES    AGE     VERSION   INTERNAL-IP       EXTERNAL-IP   OS-IMAGE                KERNEL-VERSION          CONTAINER-RUNTIME
+k8s-master   Ready    master   9m56s   v1.16.2   192.168.237.140   <none>        CentOS Linux 7 (Core)   3.10.0-957.el7.x86_64   docker://18.9.7
+
+3、加入worker节点
+# 开启防火墙
+[root@k8s-master ~]# systemctl enable firewalld && systemctl start firewalld
+Failed to execute operation: Cannot send after transport endpoint shutdown
+[root@k8s-master ~]# systemctl status firewalld
+● firewalld.service
+   Loaded: masked (/dev/null; bad)
+   Active: inactive (dead)
+
+Nov 18 09:28:37 k8s-master systemd[1]: Cannot add dependency job for unit firewalld.service, ignoring: Unit is masked.
+Warning: firewalld.service changed on disk. Run 'systemctl daemon-reload' to reload units.
+[root@k8s-master ~]# systemctl unmask firewalld
+Removed symlink /etc/systemd/system/firewalld.service.
+[root@k8s-master ~]# systemctl enable firewalld && systemctl start firewalld
+
+# 开启6443端口
+[root@k8s-master ~]# firewall-cmd --zone=public --add-port=6443/tcp --permanent
+success
+[root@k8s-master ~]# firewall-cmd --reload
+success
+[root@k8s-master ~]# firewall-cmd --list-ports
+8080/tcp 6443/tcp
+[root@k8s-master ~]#
+
+
+# kubeadm重新生成token
+[root@k8s-master ~]# kubeadm token create --print-join-command
+kubeadm join apiserver.demo:6443 --token yc2z6r.bm05748ikhttnbaa     --discovery-token-ca-cert-hash sha256:c1ac62b51de4bca1c4a41ed1543dce29b79edc262dde4821209c2784848875bd
+
+# 加入worker[k8s-node1]节点
+[root@k8s-node1 ~]# kubeadm join apiserver.demo:6443 --token yc2z6r.bm05748ikhttnbaa     --discovery-token-ca-cert-hash sha256:c1ac62b51de4bca1c4a41ed1543dce29b79edc262dde4821209c2784848875bd
+[preflight] Running pre-flight checks
+[preflight] Reading configuration from the cluster...
+[preflight] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -oyaml'
+[kubelet-start] Downloading configuration for the kubelet from the "kubelet-config-1.16" ConfigMap in the kube-system namespace
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+[kubelet-start] Activating the kubelet service
+[kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap...
+
+This node has joined the cluster:
+* Certificate signing request was sent to apiserver and a response was received.
+* The Kubelet was informed of the new secure connection details.
+
+Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+
+# 加入worker[k8s-node2]节点
+[root@k8s-node2 ~]# kubeadm join apiserver.demo:6443 --token yc2z6r.bm05748ikhttnbaa     --discovery-token-ca-cert-hash sha256:c1ac62b51de4bca1c4a41ed1543dce29b79edc262dde4821209c2784848875bd
+[preflight] Running pre-flight checks
+[preflight] Reading configuration from the cluster...
+[preflight] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -oyaml'
+[kubelet-start] Downloading configuration for the kubelet from the "kubelet-config-1.16" ConfigMap in the kube-system namespace
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+[kubelet-start] Activating the kubelet service
+[kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap...
+
+This node has joined the cluster:
+* Certificate signing request was sent to apiserver and a response was received.
+* The Kubelet was informed of the new secure connection details.
+
+Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+
+# 查看pods
+[root@k8s-master ~]# kubectl get pods -A -o wide
+NAMESPACE     NAME                                      READY   STATUS    RESTARTS   AGE   IP                NODE         NOMINATED NODE   READINESS GATES
+kube-system   calico-kube-controllers-dc6cb64cb-ds7cv   1/1     Running   0          17m   192.168.235.193   k8s-master   <none>           <none>
+kube-system   calico-node-cjcsn                         0/1     Running   0          13m   192.168.237.142   k8s-node2    <none>           <none>
+kube-system   calico-node-jstq8                         0/1     Running   0          13m   192.168.237.141   k8s-node1    <none>           <none>
+kube-system   calico-node-mkmqn                         0/1     Running   0          17m   192.168.237.140   k8s-master   <none>           <none>
+kube-system   coredns-67c766df46-qvpgh                  1/1     Running   0          19m   192.168.235.194   k8s-master   <none>           <none>
+kube-system   coredns-67c766df46-vkr72                  1/1     Running   0          19m   192.168.235.192   k8s-master   <none>           <none>
+kube-system   etcd-k8s-master                           1/1     Running   0          19m   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-apiserver-k8s-master                 1/1     Running   0          19m   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-controller-manager-k8s-master        1/1     Running   0          19m   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-proxy-9f8bs                          1/1     Running   0          13m   192.168.237.141   k8s-node1    <none>           <none>
+kube-system   kube-proxy-gjpjb                          1/1     Running   0          13m   192.168.237.142   k8s-node2    <none>           <none>
+kube-system   kube-proxy-mgl24                          1/1     Running   0          19m   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-scheduler-k8s-master                 1/1     Running   0          19m   192.168.237.140   k8s-master   <none>           <none>
+
+# 查看nodes
+[root@k8s-master ~]# kubectl get nodes -A -o wide
+NAME         STATUS   ROLES    AGE   VERSION   INTERNAL-IP       EXTERNAL-IP   OS-IMAGE                KERNEL-VERSION          CONTAINER-RUNTIME
+k8s-master   Ready    master   20m   v1.16.2   192.168.237.140   <none>        CentOS Linux 7 (Core)   3.10.0-957.el7.x86_64   docker://18.9.7
+k8s-node1    Ready    <none>   13m   v1.16.2   192.168.237.141   <none>        CentOS Linux 7 (Core)   3.10.0-957.el7.x86_64   docker://18.9.7
+k8s-node2    Ready    <none>   13m   v1.16.2   192.168.237.142   <none>        CentOS Linux 7 (Core)   3.10.0-957.el7.x86_64   docker://18.9.7
+
+
+# 查看pods，发现calico-node-*** READY状态异常，查看 master calico-node
+[root@k8s-master ~]# kubectl describe -n kube-system pod calico-node-mkmqn
+Name:                 calico-node-mkmqn
+Namespace:            kube-system
+Priority:             2000001000
+Priority Class Name:  system-node-critical
+Node:                 k8s-master/192.168.237.140
+Start Time:           Tue, 19 Nov 2019 11:02:59 +0800
+Labels:               controller-revision-hash=76f7dd658c
+                      k8s-app=calico-node
+                      pod-template-generation=1
+Annotations:          scheduler.alpha.kubernetes.io/critical-pod:
+Status:               Running
+IP:                   192.168.237.140
+IPs:
+  IP:           192.168.237.140
+Controlled By:  DaemonSet/calico-node
+Init Containers:
+  upgrade-ipam:
+    Container ID:  docker://01a8865c8a73accc224ff15b411321769e69fe3e53ae30dac1e935a38f935533
+    Image:         calico/cni:v3.9.2
+    Image ID:      docker-pullable://calico/cni@sha256:1f8d60c9334e866ae07ebe193e26054be17164d00435882110e7a8e6b4764161
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      /opt/cni/bin/calico-ipam
+      -upgrade
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Tue, 19 Nov 2019 11:03:00 +0800
+      Finished:     Tue, 19 Nov 2019 11:03:00 +0800
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      KUBERNETES_NODE_NAME:        (v1:spec.nodeName)
+      CALICO_NETWORKING_BACKEND:  <set to the key 'calico_backend' of config map 'calico-config'>  Optional: false
+    Mounts:
+      /host/opt/cni/bin from cni-bin-dir (rw)
+      /var/lib/cni/networks from host-local-net-dir (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from calico-node-token-szlz5 (ro)
+  install-cni:
+    Container ID:  docker://dc152ce80201bec2bc874c1342b41a026fb67abb2b11a8f14d56307f6a45a1a5
+    Image:         calico/cni:v3.9.2
+    Image ID:      docker-pullable://calico/cni@sha256:1f8d60c9334e866ae07ebe193e26054be17164d00435882110e7a8e6b4764161
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      /install-cni.sh
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Tue, 19 Nov 2019 11:03:00 +0800
+      Finished:     Tue, 19 Nov 2019 11:03:01 +0800
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      CNI_CONF_NAME:         10-calico.conflist
+      CNI_NETWORK_CONFIG:    <set to the key 'cni_network_config' of config map 'calico-config'>  Optional: false
+      KUBERNETES_NODE_NAME:   (v1:spec.nodeName)
+      CNI_MTU:               <set to the key 'veth_mtu' of config map 'calico-config'>  Optional: false
+      SLEEP:                 false
+    Mounts:
+      /host/etc/cni/net.d from cni-net-dir (rw)
+      /host/opt/cni/bin from cni-bin-dir (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from calico-node-token-szlz5 (ro)
+  flexvol-driver:
+    Container ID:   docker://4c0afb4682747caf9495a8e723979cde0a534c2c316f803461f3581fd68ec91e
+    Image:          calico/pod2daemon-flexvol:v3.9.2
+    Image ID:       docker-pullable://calico/pod2daemon-flexvol@sha256:99e5c0ad3812d56cacb633df45fb87daba80b6688f3ea0e6119ddc2768e501bd
+    Port:           <none>
+    Host Port:      <none>
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Tue, 19 Nov 2019 11:03:02 +0800
+      Finished:     Tue, 19 Nov 2019 11:03:02 +0800
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /host/driver from flexvol-driver-host (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from calico-node-token-szlz5 (ro)
+Containers:
+  calico-node:
+    Container ID:   docker://f41b5c18a61d482f5ddc911013b89df050b558730ccacefb5d6d3e6e9e8490a2
+    Image:          calico/node:v3.9.2
+    Image ID:       docker-pullable://calico/node@sha256:8474e9e5a24eb083810e3c7fc2c79685adeea26b0d46885a706c4999e031e571
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Tue, 19 Nov 2019 11:03:03 +0800
+    Ready:          False
+    Restart Count:  0
+    Requests:
+      cpu:      250m
+    Liveness:   exec [/bin/calico-node -felix-live] delay=10s timeout=1s period=10s #success=1 #failure=6
+    Readiness:  exec [/bin/calico-node -felix-ready -bird-ready] delay=0s timeout=1s period=10s #success=1 #failure=3
+    Environment:
+      DATASTORE_TYPE:                     kubernetes
+      WAIT_FOR_DATASTORE:                 true
+      NODENAME:                            (v1:spec.nodeName)
+      CALICO_NETWORKING_BACKEND:          <set to the key 'calico_backend' of config map 'calico-config'>  Optional: false
+      CLUSTER_TYPE:                       k8s,bgp
+      IP_AUTODETECTION_METHOD:            interface=ens.*
+      IP:                                 autodetect
+      CALICO_IPV4POOL_IPIP:               off
+      FELIX_IPINIPMTU:                    <set to the key 'veth_mtu' of config map 'calico-config'>  Optional: false
+      CALICO_IPV4POOL_CIDR:               192.168.0.0/16
+      CALICO_DISABLE_FILE_LOGGING:        true
+      FELIX_DEFAULTENDPOINTTOHOSTACTION:  ACCEPT
+      FELIX_IPV6SUPPORT:                  false
+      FELIX_LOGSEVERITYSCREEN:            info
+      FELIX_HEALTHENABLED:                true
+    Mounts:
+      /lib/modules from lib-modules (ro)
+      /run/xtables.lock from xtables-lock (rw)
+      /var/lib/calico from var-lib-calico (rw)
+      /var/run/calico from var-run-calico (rw)
+      /var/run/nodeagent from policysync (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from calico-node-token-szlz5 (ro)
+Conditions:
+  Type              Status
+  Initialized       True
+  Ready             False
+  ContainersReady   False
+  PodScheduled      True
+Volumes:
+  lib-modules:
+    Type:          HostPath (bare host directory volume)
+    Path:          /lib/modules
+    HostPathType:
+  var-run-calico:
+    Type:          HostPath (bare host directory volume)
+    Path:          /var/run/calico
+    HostPathType:
+  var-lib-calico:
+    Type:          HostPath (bare host directory volume)
+    Path:          /var/lib/calico
+    HostPathType:
+  xtables-lock:
+    Type:          HostPath (bare host directory volume)
+    Path:          /run/xtables.lock
+    HostPathType:  FileOrCreate
+  cni-bin-dir:
+    Type:          HostPath (bare host directory volume)
+    Path:          /opt/cni/bin
+    HostPathType:
+  cni-net-dir:
+    Type:          HostPath (bare host directory volume)
+    Path:          /etc/cni/net.d
+    HostPathType:
+  host-local-net-dir:
+    Type:          HostPath (bare host directory volume)
+    Path:          /var/lib/cni/networks
+    HostPathType:
+  policysync:
+    Type:          HostPath (bare host directory volume)
+    Path:          /var/run/nodeagent
+    HostPathType:  DirectoryOrCreate
+  flexvol-driver-host:
+    Type:          HostPath (bare host directory volume)
+    Path:          /usr/libexec/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds
+    HostPathType:  DirectoryOrCreate
+  calico-node-token-szlz5:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  calico-node-token-szlz5
+    Optional:    false
+QoS Class:       Burstable
+Node-Selectors:  beta.kubernetes.io/os=linux
+Tolerations:     :NoSchedule
+                 :NoExecute
+                 CriticalAddonsOnly
+                 node.kubernetes.io/disk-pressure:NoSchedule
+                 node.kubernetes.io/memory-pressure:NoSchedule
+                 node.kubernetes.io/network-unavailable:NoSchedule
+                 node.kubernetes.io/not-ready:NoExecute
+                 node.kubernetes.io/pid-pressure:NoSchedule
+                 node.kubernetes.io/unreachable:NoExecute
+                 node.kubernetes.io/unschedulable:NoSchedule
+Events:
+  Type     Reason     Age                  From                 Message
+  ----     ------     ----                 ----                 -------
+  Normal   Scheduled  <unknown>            default-scheduler    Successfully assigned kube-system/calico-node-mkmqn to k8s-master
+  Normal   Pulled     19m                  kubelet, k8s-master  Container image "calico/cni:v3.9.2" already present on machine
+  Normal   Created    19m                  kubelet, k8s-master  Created container upgrade-ipam
+  Normal   Started    19m                  kubelet, k8s-master  Started container install-cni
+  Normal   Started    19m                  kubelet, k8s-master  Started container upgrade-ipam
+  Normal   Pulled     19m                  kubelet, k8s-master  Container image "calico/cni:v3.9.2" already present on machine
+  Normal   Created    19m                  kubelet, k8s-master  Created container install-cni
+  Normal   Pulled     19m                  kubelet, k8s-master  Container image "calico/pod2daemon-flexvol:v3.9.2" already present on machine
+  Normal   Created    19m                  kubelet, k8s-master  Created container flexvol-driver
+  Normal   Started    19m                  kubelet, k8s-master  Started container flexvol-driver
+  Normal   Started    19m                  kubelet, k8s-master  Started container calico-node
+  Normal   Pulled     19m                  kubelet, k8s-master  Container image "calico/node:v3.9.2" already present on machine
+  Normal   Created    19m                  kubelet, k8s-master  Created container calico-node
+  Warning  Unhealthy  15m                  kubelet, k8s-master  Readiness probe failed: calico/node is not ready: BIRD is not ready: BGP not established with 192.168.237.1412019-11-19 03:06:49.563 [INFO][702] health.go 114: Number of node(s) with BGP peering established = 0
+  Warning  Unhealthy  15m                  kubelet, k8s-master  Readiness probe failed: calico/node is not ready: BIRD is not ready: BGP not established with 192.168.237.141,192.168.237.1422019-11-19 03:06:59.554 [INFO][732] health.go 114: Number of node(s) with BGP peering established = 0
+  Warning  Unhealthy  15m                  kubelet, k8s-master  Readiness probe failed: calico/node is not ready: BIRD is not ready: BGP not established with 192.168.237.141,192.168.237.1422019-11-19 03:07:09.555 [INFO][755] health.go 114: Number of node(s) with BGP peering established = 0
+  Warning  Unhealthy  14m                  kubelet, k8s-master  Readiness probe failed: calico/node is not ready: BIRD is not ready: BGP not established with 192.168.237.141,192.168.237.1422019-11-19 03:07:19.550 [INFO][777] health.go 114: Number of node(s) with BGP peering established = 0
+  Warning  Unhealthy  14m                  kubelet, k8s-master  Readiness probe failed: calico/node is not ready: BIRD is not ready: BGP not established with 192.168.237.141,192.168.237.1422019-11-19 03:07:29.555 [INFO][808] health.go 114: Number of node(s) with BGP peering established = 0
+  Warning  Unhealthy  14m                  kubelet, k8s-master  Readiness probe failed: calico/node is not ready: BIRD is not ready: BGP not established with 192.168.237.141,192.168.237.1422019-11-19 03:07:39.579 [INFO][828] health.go 114: Number of node(s) with BGP peering established = 0
+  Warning  Unhealthy  14m                  kubelet, k8s-master  Readiness probe failed: calico/node is not ready: BIRD is not ready: BGP not established with 192.168.237.141,192.168.237.1422019-11-19 03:07:49.561 [INFO][850] health.go 114: Number of node(s) with BGP peering established = 0
+  Warning  Unhealthy  14m                  kubelet, k8s-master  Readiness probe failed: calico/node is not ready: BIRD is not ready: BGP not established with 192.168.237.141,192.168.237.1422019-11-19 03:07:59.562 [INFO][872] health.go 114: Number of node(s) with BGP peering established = 0
+  Warning  Unhealthy  14m                  kubelet, k8s-master  Readiness probe failed: calico/node is not ready: BIRD is not ready: BGP not established with 192.168.237.141,192.168.237.1422019-11-19 03:08:09.547 [INFO][894] health.go 114: Number of node(s) with BGP peering established = 0
+  Warning  Unhealthy  4m8s (x60 over 13m)  kubelet, k8s-master  (combined from similar events): Readiness probe failed: calico/node is not ready: BIRD is not ready: BGP not established with 192.168.237.141,192.168.237.1422019-11-19 03:18:09.549 [INFO][2286] health.go 114: Number of node(s) with BGP peering established = 0
+
+[root@k8s-master ~]# kubectl exec -it calico-kube-controllers-dc6cb64cb-ds7cv bash -n kube-system
+Error from server: error dialing backend: dial tcp 192.168.237.141:10250: connect: connection timed out
+
+# node1 和 node2 开放 10250 端口
+[root@k8s-node1 ~]# systemctl unmask firewalld
+Removed symlink /etc/systemd/system/firewalld.service.
+[root@k8s-node1 ~]# systemctl enable firewalld && systemctl start firewalld
+[root@k8s-node1 ~]# firewall-cmd --zone=public --add-port=10250/tcp --permanent
+success
+[root@k8s-node1 ~]# firewall-cmd --reload
+success
+[root@k8s-node1 ~]#
+
+[root@k8s-node2 ~]# systemctl unmask firewalld
+Removed symlink /etc/systemd/system/firewalld.service.
+[root@k8s-node2 ~]# systemctl enable firewalld && systemctl start firewalld
+[root@k8s-node2 ~]# firewall-cmd --zone=public --add-port=10250/tcp --permanent
+success
+[root@k8s-node2 ~]# firewall-cmd --reload
+success
+[root@k8s-node2 ~]#
+
+[root@k8s-master ~]# kubectl exec -it calico-kube-controllers-dc6cb64cb-ds7cv bash -n kube-system
+OCI runtime exec failed: exec failed: container_linux.go:346: starting container process caused "exec: \"bash\": executable file not found in $PATH": unknown
+command terminated with exit code 126
+
+[root@k8s-master ~]# kubectl delete -f calico-3.9.2.yaml
+configmap "calico-config" deleted
+customresourcedefinition.apiextensions.k8s.io "felixconfigurations.crd.projectcalico.org" deleted
+customresourcedefinition.apiextensions.k8s.io "ipamblocks.crd.projectcalico.org" deleted
+customresourcedefinition.apiextensions.k8s.io "blockaffinities.crd.projectcalico.org" deleted
+customresourcedefinition.apiextensions.k8s.io "ipamhandles.crd.projectcalico.org" deleted
+customresourcedefinition.apiextensions.k8s.io "ipamconfigs.crd.projectcalico.org" deleted
+customresourcedefinition.apiextensions.k8s.io "bgppeers.crd.projectcalico.org" deleted
+customresourcedefinition.apiextensions.k8s.io "bgpconfigurations.crd.projectcalico.org" deleted
+customresourcedefinition.apiextensions.k8s.io "ippools.crd.projectcalico.org" deleted
+customresourcedefinition.apiextensions.k8s.io "hostendpoints.crd.projectcalico.org" deleted
+customresourcedefinition.apiextensions.k8s.io "clusterinformations.crd.projectcalico.org" deleted
+customresourcedefinition.apiextensions.k8s.io "globalnetworkpolicies.crd.projectcalico.org" deleted
+customresourcedefinition.apiextensions.k8s.io "globalnetworksets.crd.projectcalico.org" deleted
+customresourcedefinition.apiextensions.k8s.io "networkpolicies.crd.projectcalico.org" deleted
+customresourcedefinition.apiextensions.k8s.io "networksets.crd.projectcalico.org" deleted
+clusterrole.rbac.authorization.k8s.io "calico-kube-controllers" deleted
+clusterrolebinding.rbac.authorization.k8s.io "calico-kube-controllers" deleted
+clusterrole.rbac.authorization.k8s.io "calico-node" deleted
+clusterrolebinding.rbac.authorization.k8s.io "calico-node" deleted
+daemonset.apps "calico-node" deleted
+serviceaccount "calico-node" deleted
+deployment.apps "calico-kube-controllers" deleted
+serviceaccount "calico-kube-controllers" deleted
+
+# 删除calico网络后重新查看pods
+[root@k8s-master ~]# kubectl get pods -A -o wide
+NAMESPACE     NAME                                 READY   STATUS    RESTARTS   AGE   IP                NODE         NOMINATED NODE   READINESS GATES
+kube-system   coredns-67c766df46-qvpgh             1/1     Running   0          26m   192.168.235.194   k8s-master   <none>           <none>
+kube-system   coredns-67c766df46-vkr72             1/1     Running   0          26m   192.168.235.192   k8s-master   <none>           <none>
+kube-system   etcd-k8s-master                      1/1     Running   0          26m   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-apiserver-k8s-master            1/1     Running   0          26m   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-controller-manager-k8s-master   1/1     Running   0          26m   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-proxy-9f8bs                     1/1     Running   0          20m   192.168.237.141   k8s-node1    <none>           <none>
+kube-system   kube-proxy-gjpjb                     1/1     Running   0          20m   192.168.237.142   k8s-node2    <none>           <none>
+kube-system   kube-proxy-mgl24                     1/1     Running   0          26m   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-scheduler-k8s-master            1/1     Running   0          26m   192.168.237.140   k8s-master   <none>           <none>
+
+[root@k8s-master ~]# kubectl get nodes
+NAME         STATUS   ROLES    AGE   VERSION
+k8s-master   Ready    master   32h   v1.16.2
+k8s-node1    Ready    <none>   23h   v1.16.2
+k8s-node2    Ready    <none>   23h   v1.16.2
+
+
+# 修改calico-3.9.2.yaml，新增 IP_AUTODETECTION_METHOD，修改 CALICO_IPV4POOL_IPIP 的value为 off
+            # Cluster type to identify the deployment type
+            - name: CLUSTER_TYPE
+              value: "k8s,bgp"
+            # 调整IP自动侦测方法
+            - name: IP_AUTODETECTION_METHOD
+              value: "interface=ens.*"
+
+参照 k8s_yaml/calico.yaml（v3.10.1）
+[root@k8s-master ~]# kubectl apply -f calico.yaml
+configmap/calico-config created
+customresourcedefinition.apiextensions.k8s.io/felixconfigurations.crd.projectcalico.org created
+customresourcedefinition.apiextensions.k8s.io/ipamblocks.crd.projectcalico.org created
+customresourcedefinition.apiextensions.k8s.io/blockaffinities.crd.projectcalico.org created
+customresourcedefinition.apiextensions.k8s.io/ipamhandles.crd.projectcalico.org created
+customresourcedefinition.apiextensions.k8s.io/ipamconfigs.crd.projectcalico.org created
+customresourcedefinition.apiextensions.k8s.io/bgppeers.crd.projectcalico.org created
+customresourcedefinition.apiextensions.k8s.io/bgpconfigurations.crd.projectcalico.org created
+customresourcedefinition.apiextensions.k8s.io/ippools.crd.projectcalico.org created
+customresourcedefinition.apiextensions.k8s.io/hostendpoints.crd.projectcalico.org created
+customresourcedefinition.apiextensions.k8s.io/clusterinformations.crd.projectcalico.org created
+customresourcedefinition.apiextensions.k8s.io/globalnetworkpolicies.crd.projectcalico.org created
+customresourcedefinition.apiextensions.k8s.io/globalnetworksets.crd.projectcalico.org created
+customresourcedefinition.apiextensions.k8s.io/networkpolicies.crd.projectcalico.org created
+customresourcedefinition.apiextensions.k8s.io/networksets.crd.projectcalico.org created
+clusterrole.rbac.authorization.k8s.io/calico-kube-controllers created
+clusterrolebinding.rbac.authorization.k8s.io/calico-kube-controllers created
+clusterrole.rbac.authorization.k8s.io/calico-node created
+clusterrolebinding.rbac.authorization.k8s.io/calico-node created
+daemonset.apps/calico-node created
+serviceaccount/calico-node created
+deployment.apps/calico-kube-controllers created
+serviceaccount/calico-kube-controllers created
+
+# 重新应用calico后，查看pods，calico-node master Ready状态错误，但是所有的calico-node describe都有异常信息
+[root@k8s-master ~]# kubectl get pods -A -o wide
+NAMESPACE     NAME                                       READY   STATUS    RESTARTS   AGE     IP                NODE         NOMINATED NODE   READINESS GATES
+kube-system   calico-kube-controllers-6b64bcd855-db8vg   1/1     Running   0          32m     192.168.169.129   k8s-node2    <none>           <none>
+kube-system   calico-node-9nxs4                          0/1     Running   0          32m     192.168.237.140   k8s-master   <none>           <none>
+kube-system   calico-node-rdwj4                          1/1     Running   0          32m     192.168.237.141   k8s-node1    <none>           <none>
+kube-system   calico-node-tprlb                          1/1     Running   0          32m     192.168.237.142   k8s-node2    <none>           <none>
+kube-system   coredns-67c766df46-qvpgh                   1/1     Running   2          5h16m   192.168.235.195   k8s-master   <none>           <none>
+kube-system   coredns-67c766df46-vkr72                   1/1     Running   8          5h16m   192.168.235.196   k8s-master   <none>           <none>
+kube-system   etcd-k8s-master                            1/1     Running   2          5h15m   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-apiserver-k8s-master                  1/1     Running   2          5h15m   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-controller-manager-k8s-master         1/1     Running   2          5h15m   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-proxy-9f8bs                           1/1     Running   0          5h10m   192.168.237.141   k8s-node1    <none>           <none>
+kube-system   kube-proxy-gjpjb                           1/1     Running   0          5h10m   192.168.237.142   k8s-node2    <none>           <none>
+kube-system   kube-proxy-mgl24                           1/1     Running   2          5h16m   192.168.237.140   k8s-master   <none>           <none>
+kube-system   kube-scheduler-k8s-master                  1/1     Running   2          5h15m   192.168.237.140   k8s-master   <none>           <none>
+[root@k8s-master ~]# kubectl get nodes -A -o wide
+NAME         STATUS   ROLES    AGE     VERSION   INTERNAL-IP       EXTERNAL-IP   OS-IMAGE                KERNEL-VERSION          CONTAINER-RUNTIME
+k8s-master   Ready    master   5h16m   v1.16.2   192.168.237.140   <none>        CentOS Linux 7 (Core)   3.10.0-957.el7.x86_64   docker://18.9.7
+k8s-node1    Ready    <none>   5h10m   v1.16.2   192.168.237.141   <none>        CentOS Linux 7 (Core)   3.10.0-957.el7.x86_64   docker://18.9.7
+k8s-node2    Ready    <none>   5h10m   v1.16.2   192.168.237.142   <none>        CentOS Linux 7 (Core)   3.10.0-957.el7.x86_64   docker://18.9.7
+
+#################### calico-node问题依然存在
+
+# 编辑calico-node yaml
+kubectl edit -n kube-system pod calico-node-8k9n4
+
+
+
+
+
+
+
+
+
+
+
+

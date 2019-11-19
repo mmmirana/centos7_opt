@@ -59,7 +59,7 @@
 3、修改Docker镜像源，/etc/docker/daemon.json写入以下内容
     [root@localhost ~]# cat /etc/docker/daemon.json
     {
-        "registry-mirrors": ["http://hub-mirror.c.163.com"]
+        "registry-mirrors": ["https://zpqszrst.mirror.aliyuncs.com"]
     }
 
 4、重启Docker
@@ -149,6 +149,9 @@
     [root@localhost ~]# docker images
     REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
 
+    [root@localhost ~]# docker rmi -f `docker images -q`
+    REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+
 8、删除某个container
 
     [root@localhost ~]# docker ps
@@ -175,7 +178,8 @@
     485bddc78ae8        9b9cb95443b5        "/bin/echo 'Hello wo…"   7 hours ago         Exited (0) 7 hours ago                            gallant_banzai
     018b86f38fd5        9b9cb95443b5        "/bin/echo 'Hello wo…"   7 hours ago         Exited (0) 7 hours ago                            inspiring_franklin
 
-    [root@localhost ~]# docker rm $(docker ps -a -q)
+    # 或者 docker rm $(docker ps -a -q)
+    [root@localhost ~]# docker rm `docker ps -a -q`
     9e377dc9fde3
     e68ba125f9e3
     b042ee32107a
@@ -249,7 +253,7 @@ Docker 部署Nginx
     </body>
     </html>
 
-6、监测Nginx引用状态
+6、监测Nginx应用状态
 
     [root@localhost ~]# docker inspect ad7cc45c81ffadbd44254c1c043e048c677a4ebcd4ca618efcd098729cec2fa5
     [
@@ -609,7 +613,7 @@ Docker部署springboot项目
     # 修改镜像源
     [root@k8s_master springboot]# cat /etc/docker/daemon.json
     {
-        "registry-mirrors": ["http://c02963b7.m.daocloud.io"]
+        "registry-mirrors": ["https://zpqszrst.mirror.aliyuncs.com"]
     }
 
     [root@k8s_master springboot]# docker build -t docker_springboot .
@@ -803,24 +807,6 @@ Docker部署springboot项目
         CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                    NAMES
         2b03a8f68eb9        docker_springboot   "java -jar app.jar..."   3 seconds ago       Up 2 seconds        0.0.0.0:9092->8080/tcp   springboot_9092
         fb7901a78981        docker_springboot   "java -jar app.jar..."   6 seconds ago       Up 5 seconds        0.0.0.0:9091->8080/tcp   springboot_9091
-
-        [root@k8s_master springboot]# docker ps --help
-
-        Usage:	docker ps [OPTIONS]
-
-        List containers
-
-        Options:
-         -a, --all             Show all containers (default shows just running)
-         -f, --filter filter   Filter output based on conditions provided
-             --format string   Pretty-print containers using a Go template
-             --help            Print usage
-         -n, --last int        Show n last created containers (includes all states) (default -1)
-         -l, --latest          Show the latest created container (includes all states)
-             --no-trunc        Don't truncate output
-         -q, --quiet           Only display numeric IDs
-         -s, --size            Display total file sizes
-
         [root@k8s_master springboot]# docker stop $(docker ps -q) & docker rm -f $(docker ps -aq)
         [1] 5881
         2b03a8f68eb9
@@ -828,6 +814,495 @@ Docker部署springboot项目
         fb7901a78981
         fb7901a78981
         [1]+  Done                    docker stop $(docker ps -q)
+
+
+8 升级docker
+    安装yum-utils
+        [root@localhost ~]# yum install -y yum-utils device-mapper-persistent-data lvm2
+        Loaded plugins: fastestmirror
+        Loading mirror speeds from cached hostfile
+        epel/x86_64/metalink                                                                                                | 7.7 kB  00:00:00
+         * epel: mirrors.aliyun.com
+        base                                                                                                                | 3.6 kB  00:00:00
+        epel                                                                                                                | 5.3 kB  00:00:00
+        extras                                                                                                              | 2.9 kB  00:00:00
+        updates                                                                                                             | 2.9 kB  00:00:00
+        Resolving Dependencies
+        --> Running transaction check
+        ---> Package device-mapper-persistent-data.x86_64 0:0.7.3-3.el7 will be updated
+        ---> Package device-mapper-persistent-data.x86_64 0:0.8.5-1.el7 will be an update
+        ---> Package lvm2.x86_64 7:2.02.180-8.el7 will be updated
+        ---> Package lvm2.x86_64 7:2.02.185-2.el7_7.2 will be an update
+        --> Processing Dependency: lvm2-libs = 7:2.02.185-2.el7_7.2 for package: 7:lvm2-2.02.185-2.el7_7.2.x86_64
+        ---> Package yum-utils.noarch 0:1.1.31-52.el7 will be installed
+        --> Processing Dependency: python-kitchen for package: yum-utils-1.1.31-52.el7.noarch
+        --> Processing Dependency: libxml2-python for package: yum-utils-1.1.31-52.el7.noarch
+        --> Running transaction check
+        ---> Package libxml2-python.x86_64 0:2.9.1-6.el7_2.3 will be installed
+        ---> Package lvm2-libs.x86_64 7:2.02.180-8.el7 will be updated
+        ---> Package lvm2-libs.x86_64 7:2.02.185-2.el7_7.2 will be an update
+        --> Processing Dependency: device-mapper-event = 7:1.02.158-2.el7_7.2 for package: 7:lvm2-libs-2.02.185-2.el7_7.2.x86_64
+        ---> Package python-kitchen.noarch 0:1.1.1-5.el7 will be installed
+        --> Processing Dependency: python-chardet for package: python-kitchen-1.1.1-5.el7.noarch
+        --> Running transaction check
+        ---> Package device-mapper-event.x86_64 7:1.02.149-8.el7 will be updated
+        ---> Package device-mapper-event.x86_64 7:1.02.158-2.el7_7.2 will be an update
+        --> Processing Dependency: device-mapper-event-libs = 7:1.02.158-2.el7_7.2 for package: 7:device-mapper-event-1.02.158-2.el7_7.2.x86_64
+        --> Processing Dependency: device-mapper = 7:1.02.158-2.el7_7.2 for package: 7:device-mapper-event-1.02.158-2.el7_7.2.x86_64
+        ---> Package python-chardet.noarch 0:2.2.1-3.el7 will be installed
+        --> Running transaction check
+        ---> Package device-mapper.x86_64 7:1.02.149-8.el7 will be updated
+        --> Processing Dependency: device-mapper = 7:1.02.149-8.el7 for package: 7:device-mapper-libs-1.02.149-8.el7.x86_64
+        ---> Package device-mapper.x86_64 7:1.02.158-2.el7_7.2 will be an update
+        ---> Package device-mapper-event-libs.x86_64 7:1.02.149-8.el7 will be updated
+        ---> Package device-mapper-event-libs.x86_64 7:1.02.158-2.el7_7.2 will be an update
+        --> Running transaction check
+        ---> Package device-mapper-libs.x86_64 7:1.02.149-8.el7 will be updated
+        ---> Package device-mapper-libs.x86_64 7:1.02.158-2.el7_7.2 will be an update
+        --> Finished Dependency Resolution
+
+        Dependencies Resolved
+
+        ===========================================================================================================================================
+         Package                                       Arch                   Version                                Repository               Size
+        ===========================================================================================================================================
+        Installing:
+         yum-utils                                     noarch                 1.1.31-52.el7                          base                    121 k
+        Updating:
+         device-mapper-persistent-data                 x86_64                 0.8.5-1.el7                            base                    423 k
+         lvm2                                          x86_64                 7:2.02.185-2.el7_7.2                   updates                 1.3 M
+        Installing for dependencies:
+         libxml2-python                                x86_64                 2.9.1-6.el7_2.3                        base                    247 k
+         python-chardet                                noarch                 2.2.1-3.el7                            base                    227 k
+         python-kitchen                                noarch                 1.1.1-5.el7                            base                    267 k
+        Updating for dependencies:
+         device-mapper                                 x86_64                 7:1.02.158-2.el7_7.2                   updates                 294 k
+         device-mapper-event                           x86_64                 7:1.02.158-2.el7_7.2                   updates                 190 k
+         device-mapper-event-libs                      x86_64                 7:1.02.158-2.el7_7.2                   updates                 189 k
+         device-mapper-libs                            x86_64                 7:1.02.158-2.el7_7.2                   updates                 322 k
+         lvm2-libs                                     x86_64                 7:2.02.185-2.el7_7.2                   updates                 1.1 M
+
+        Transaction Summary
+        ===========================================================================================================================================
+        Install  1 Package  (+3 Dependent packages)
+        Upgrade  2 Packages (+5 Dependent packages)
+
+        Total download size: 4.6 M
+        Downloading packages:
+        No Presto metadata available for base
+        No Presto metadata available for updates
+        (1/11): device-mapper-event-1.02.158-2.el7_7.2.x86_64.rpm                                                           | 190 kB  00:00:00
+        (2/11): device-mapper-event-libs-1.02.158-2.el7_7.2.x86_64.rpm                                                      | 189 kB  00:00:00
+        (3/11): device-mapper-1.02.158-2.el7_7.2.x86_64.rpm                                                                 | 294 kB  00:00:00
+        (4/11): device-mapper-libs-1.02.158-2.el7_7.2.x86_64.rpm                                                            | 322 kB  00:00:00
+        (5/11): lvm2-libs-2.02.185-2.el7_7.2.x86_64.rpm                                                                     | 1.1 MB  00:00:00
+        (6/11): lvm2-2.02.185-2.el7_7.2.x86_64.rpm                                                                          | 1.3 MB  00:00:00
+        (7/11): device-mapper-persistent-data-0.8.5-1.el7.x86_64.rpm                                                        | 423 kB  00:00:00
+        (8/11): libxml2-python-2.9.1-6.el7_2.3.x86_64.rpm                                                                   | 247 kB  00:00:00
+        (9/11): python-chardet-2.2.1-3.el7.noarch.rpm                                                                       | 227 kB  00:00:00
+        (10/11): yum-utils-1.1.31-52.el7.noarch.rpm                                                                         | 121 kB  00:00:00
+        (11/11): python-kitchen-1.1.1-5.el7.noarch.rpm                                                                      | 267 kB  00:00:00
+        -------------------------------------------------------------------------------------------------------------------------------------------
+        Total                                                                                                      2.6 MB/s | 4.6 MB  00:00:01
+        Running transaction check
+        Running transaction test
+        Transaction test succeeded
+        Running transaction
+          Updating   : 7:device-mapper-1.02.158-2.el7_7.2.x86_64                                                                              1/18
+          Updating   : 7:device-mapper-libs-1.02.158-2.el7_7.2.x86_64                                                                         2/18
+          Updating   : 7:device-mapper-event-libs-1.02.158-2.el7_7.2.x86_64                                                                   3/18
+          Updating   : 7:device-mapper-event-1.02.158-2.el7_7.2.x86_64                                                                        4/18
+          Updating   : 7:lvm2-libs-2.02.185-2.el7_7.2.x86_64                                                                                  5/18
+          Installing : python-chardet-2.2.1-3.el7.noarch                                                                                      6/18
+          Installing : python-kitchen-1.1.1-5.el7.noarch                                                                                      7/18
+          Installing : libxml2-python-2.9.1-6.el7_2.3.x86_64                                                                                  8/18
+          Updating   : device-mapper-persistent-data-0.8.5-1.el7.x86_64                                                                       9/18
+          Updating   : 7:lvm2-2.02.185-2.el7_7.2.x86_64                                                                                      10/18
+          Installing : yum-utils-1.1.31-52.el7.noarch                                                                                        11/18
+          Cleanup    : 7:lvm2-2.02.180-8.el7.x86_64                                                                                          12/18
+          Cleanup    : 7:lvm2-libs-2.02.180-8.el7.x86_64                                                                                     13/18
+          Cleanup    : 7:device-mapper-event-1.02.149-8.el7.x86_64                                                                           14/18
+          Cleanup    : 7:device-mapper-event-libs-1.02.149-8.el7.x86_64                                                                      15/18
+          Cleanup    : 7:device-mapper-1.02.149-8.el7.x86_64                                                                                 16/18
+          Cleanup    : 7:device-mapper-libs-1.02.149-8.el7.x86_64                                                                            17/18
+          Cleanup    : device-mapper-persistent-data-0.7.3-3.el7.x86_64                                                                      18/18
+          Verifying  : 7:device-mapper-libs-1.02.158-2.el7_7.2.x86_64                                                                         1/18
+          Verifying  : yum-utils-1.1.31-52.el7.noarch                                                                                         2/18
+          Verifying  : device-mapper-persistent-data-0.8.5-1.el7.x86_64                                                                       3/18
+          Verifying  : 7:lvm2-2.02.185-2.el7_7.2.x86_64                                                                                       4/18
+          Verifying  : libxml2-python-2.9.1-6.el7_2.3.x86_64                                                                                  5/18
+          Verifying  : 7:lvm2-libs-2.02.185-2.el7_7.2.x86_64                                                                                  6/18
+          Verifying  : python-kitchen-1.1.1-5.el7.noarch                                                                                      7/18
+          Verifying  : 7:device-mapper-1.02.158-2.el7_7.2.x86_64                                                                              8/18
+          Verifying  : 7:device-mapper-event-1.02.158-2.el7_7.2.x86_64                                                                        9/18
+          Verifying  : 7:device-mapper-event-libs-1.02.158-2.el7_7.2.x86_64                                                                  10/18
+          Verifying  : python-chardet-2.2.1-3.el7.noarch                                                                                     11/18
+          Verifying  : device-mapper-persistent-data-0.7.3-3.el7.x86_64                                                                      12/18
+          Verifying  : 7:lvm2-2.02.180-8.el7.x86_64                                                                                          13/18
+          Verifying  : 7:device-mapper-event-1.02.149-8.el7.x86_64                                                                           14/18
+          Verifying  : 7:lvm2-libs-2.02.180-8.el7.x86_64                                                                                     15/18
+          Verifying  : 7:device-mapper-1.02.149-8.el7.x86_64                                                                                 16/18
+          Verifying  : 7:device-mapper-libs-1.02.149-8.el7.x86_64                                                                            17/18
+          Verifying  : 7:device-mapper-event-libs-1.02.149-8.el7.x86_64                                                                      18/18
+
+        Installed:
+          yum-utils.noarch 0:1.1.31-52.el7
+
+        Dependency Installed:
+          libxml2-python.x86_64 0:2.9.1-6.el7_2.3         python-chardet.noarch 0:2.2.1-3.el7         python-kitchen.noarch 0:1.1.1-5.el7
+
+        Updated:
+          device-mapper-persistent-data.x86_64 0:0.8.5-1.el7                            lvm2.x86_64 7:2.02.185-2.el7_7.2
+
+        Dependency Updated:
+          device-mapper.x86_64 7:1.02.158-2.el7_7.2                              device-mapper-event.x86_64 7:1.02.158-2.el7_7.2
+          device-mapper-event-libs.x86_64 7:1.02.158-2.el7_7.2                   device-mapper-libs.x86_64 7:1.02.158-2.el7_7.2
+          lvm2-libs.x86_64 7:2.02.185-2.el7_7.2
+
+        Complete!
+
+    添加 docker-ce repo
+        [root@localhost ~]# yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+        Loaded plugins: fastestmirror
+        adding repo from: http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+        grabbing file http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo to /etc/yum.repos.d/docker-ce.repo
+        repo saved to /etc/yum.repos.d/docker-ce.repo
+
+    查看可用的docker-ce
+        [root@localhost ~]# yum list docker-ce --showduplicates
+        Loaded plugins: fastestmirror
+        Loading mirror speeds from cached hostfile
+         * epel: mirrors.njupt.edu.cn
+        docker-ce-stable                                                                                                    | 3.5 kB  00:00:00
+        (1/2): docker-ce-stable/x86_64/updateinfo                                                                           |   55 B  00:00:00
+        (2/2): docker-ce-stable/x86_64/primary_db                                                                           |  37 kB  00:00:00
+        Available Packages
+        docker-ce.x86_64                                          17.03.0.ce-1.el7.centos                                          docker-ce-stable
+        docker-ce.x86_64                                          17.03.1.ce-1.el7.centos                                          docker-ce-stable
+        docker-ce.x86_64                                          17.03.2.ce-1.el7.centos                                          docker-ce-stable
+        docker-ce.x86_64                                          17.03.3.ce-1.el7                                                 docker-ce-stable
+        docker-ce.x86_64                                          17.06.0.ce-1.el7.centos                                          docker-ce-stable
+        docker-ce.x86_64                                          17.06.1.ce-1.el7.centos                                          docker-ce-stable
+        docker-ce.x86_64                                          17.06.2.ce-1.el7.centos                                          docker-ce-stable
+        docker-ce.x86_64                                          17.09.0.ce-1.el7.centos                                          docker-ce-stable
+        docker-ce.x86_64                                          17.09.1.ce-1.el7.centos                                          docker-ce-stable
+        docker-ce.x86_64                                          17.12.0.ce-1.el7.centos                                          docker-ce-stable
+        docker-ce.x86_64                                          17.12.1.ce-1.el7.centos                                          docker-ce-stable
+        docker-ce.x86_64                                          18.03.0.ce-1.el7.centos                                          docker-ce-stable
+        docker-ce.x86_64                                          18.03.1.ce-1.el7.centos                                          docker-ce-stable
+        docker-ce.x86_64                                          18.06.0.ce-3.el7                                                 docker-ce-stable
+        docker-ce.x86_64                                          18.06.1.ce-3.el7                                                 docker-ce-stable
+        docker-ce.x86_64                                          18.06.2.ce-3.el7                                                 docker-ce-stable
+        docker-ce.x86_64                                          18.06.3.ce-3.el7                                                 docker-ce-stable
+        docker-ce.x86_64                                          3:18.09.0-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:18.09.1-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:18.09.2-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:18.09.3-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:18.09.4-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:18.09.5-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:18.09.6-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:18.09.7-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:18.09.8-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:18.09.9-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:19.03.0-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:19.03.1-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:19.03.2-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:19.03.3-3.el7                                                  docker-ce-stable
+        docker-ce.x86_64                                          3:19.03.4-3.el7                                                  docker-ce-stable
+
+    移除docker
+        [root@localhost ~]# yum -y remove docker*
+        Loaded plugins: fastestmirror
+        Resolving Dependencies
+        --> Running transaction check
+        ---> Package docker.x86_64 2:1.13.1-103.git7f2769b.el7.centos will be erased
+        ---> Package docker-client.x86_64 2:1.13.1-103.git7f2769b.el7.centos will be erased
+        ---> Package docker-common.x86_64 2:1.13.1-103.git7f2769b.el7.centos will be erased
+        --> Finished Dependency Resolution
+
+        Dependencies Resolved
+
+        ===========================================================================================================================================
+         Package                        Arch                    Version                                             Repository                Size
+        ===========================================================================================================================================
+        Removing:
+         docker                         x86_64                  2:1.13.1-103.git7f2769b.el7.centos                  @extras                   65 M
+         docker-client                  x86_64                  2:1.13.1-103.git7f2769b.el7.centos                  @extras                   13 M
+         docker-common                  x86_64                  2:1.13.1-103.git7f2769b.el7.centos                  @extras                  4.4 k
+
+        Transaction Summary
+        ===========================================================================================================================================
+        Remove  3 Packages
+
+        Installed size: 77 M
+        Downloading packages:
+        Running transaction check
+        Running transaction test
+        Transaction test succeeded
+        Running transaction
+          Erasing    : 2:docker-1.13.1-103.git7f2769b.el7.centos.x86_64                                                                        1/3
+        warning: /etc/sysconfig/docker-storage saved as /etc/sysconfig/docker-storage.rpmsave
+        warning: /etc/docker/daemon.json saved as /etc/docker/daemon.json.rpmsave
+          Erasing    : 2:docker-client-1.13.1-103.git7f2769b.el7.centos.x86_64                                                                 2/3
+          Erasing    : 2:docker-common-1.13.1-103.git7f2769b.el7.centos.x86_64                                                                 3/3
+          Verifying  : 2:docker-common-1.13.1-103.git7f2769b.el7.centos.x86_64                                                                 1/3
+          Verifying  : 2:docker-1.13.1-103.git7f2769b.el7.centos.x86_64                                                                        2/3
+          Verifying  : 2:docker-client-1.13.1-103.git7f2769b.el7.centos.x86_64                                                                 3/3
+
+        Removed:
+          docker.x86_64 2:1.13.1-103.git7f2769b.el7.centos                     docker-client.x86_64 2:1.13.1-103.git7f2769b.el7.centos
+          docker-common.x86_64 2:1.13.1-103.git7f2769b.el7.centos
+
+        Complete!
+        [root@localhost ~]# yum list installed |grep docker
+        containerd.io.x86_64                  1.2.10-3.2.el7                  @docker-ce-stable
+        [root@localhost ~]# yum -y remove containerd.io
+
+
+    删除docker文件
+        [root@localhost ~]# find /etc/systemd -name '*docker*' -exec rm -f {} \;
+        [root@localhost ~]# find /etc/systemd -name '*docker*' -exec rm -f {} \;
+        [root@localhost ~]# find /lib/systemd -name '*docker*' -exec rm -f {} \;
+        [root@localhost ~]# rm -rf /var/lib/docker   #删除以前已有的镜像和容器,非必要
+        [root@localhost ~]# rm -rf /var/run/docker
+
+    安装最新的docker-ce
+        [root@localhost ~]# yum install -y docker-ce # 安装最新
+        [root@localhost ~]# yum install -y docker-ce-18.09.0-3.el7 安装指定版本docker
+        Loaded plugins: fastestmirror
+        Loading mirror speeds from cached hostfile
+         * epel: mirrors.aliyun.com
+        Resolving Dependencies
+        --> Running transaction check
+        ---> Package docker-ce.x86_64 3:19.03.4-3.el7 will be installed
+        --> Processing Dependency: containerd.io >= 1.2.2-3 for package: 3:docker-ce-19.03.4-3.el7.x86_64
+        --> Processing Dependency: docker-ce-cli for package: 3:docker-ce-19.03.4-3.el7.x86_64
+        --> Running transaction check
+        ---> Package containerd.io.x86_64 0:1.2.10-3.2.el7 will be installed
+        ---> Package docker-ce-cli.x86_64 1:19.03.4-3.el7 will be installed
+        --> Finished Dependency Resolution
+
+        Dependencies Resolved
+
+        ===========================================================================================================================================
+         Package                          Arch                      Version                              Repository                           Size
+        ===========================================================================================================================================
+        Installing:
+         docker-ce                        x86_64                    3:19.03.4-3.el7                      docker-ce-stable                     24 M
+        Installing for dependencies:
+         containerd.io                    x86_64                    1.2.10-3.2.el7                       docker-ce-stable                     23 M
+         docker-ce-cli                    x86_64                    1:19.03.4-3.el7                      docker-ce-stable                     39 M
+
+        Transaction Summary
+        ===========================================================================================================================================
+        Install  1 Package (+2 Dependent packages)
+
+        Total download size: 87 M
+        Installed size: 362 M
+        Downloading packages:
+        warning: /var/cache/yum/x86_64/7/docker-ce-stable/packages/containerd.io-1.2.10-3.2.el7.x86_64.rpm: Header V4 RSA/SHA512 Signature, key ID 621e9f35: NOKEY
+        Public key for containerd.io-1.2.10-3.2.el7.x86_64.rpm is not installed
+        (1/3): containerd.io-1.2.10-3.2.el7.x86_64.rpm                                                                      |  23 MB  00:00:01
+        (2/3): docker-ce-19.03.4-3.el7.x86_64.rpm                                                                           |  24 MB  00:00:01
+        (3/3): docker-ce-cli-19.03.4-3.el7.x86_64.rpm                                                                       |  39 MB  00:00:01
+        -------------------------------------------------------------------------------------------------------------------------------------------
+        Total                                                                                                       29 MB/s |  87 MB  00:00:03
+        Retrieving key from https://mirrors.aliyun.com/docker-ce/linux/centos/gpg
+        Importing GPG key 0x621E9F35:
+         Userid     : "Docker Release (CE rpm) <docker@docker.com>"
+         Fingerprint: 060a 61c5 1b55 8a7f 742b 77aa c52f eb6b 621e 9f35
+         From       : https://mirrors.aliyun.com/docker-ce/linux/centos/gpg
+        Running transaction check
+        Running transaction test
+        Transaction test succeeded
+        Running transaction
+          Installing : containerd.io-1.2.10-3.2.el7.x86_64                                                                                     1/3
+          Installing : 1:docker-ce-cli-19.03.4-3.el7.x86_64                                                                                    2/3
+          Installing : 3:docker-ce-19.03.4-3.el7.x86_64                                                                                        3/3
+          Verifying  : 1:docker-ce-cli-19.03.4-3.el7.x86_64                                                                                    1/3
+          Verifying  : 3:docker-ce-19.03.4-3.el7.x86_64                                                                                        2/3
+          Verifying  : containerd.io-1.2.10-3.2.el7.x86_64                                                                                     3/3
+
+        Installed:
+          docker-ce.x86_64 3:19.03.4-3.el7
+
+        Dependency Installed:
+          containerd.io.x86_64 0:1.2.10-3.2.el7                                docker-ce-cli.x86_64 1:19.03.4-3.el7
+
+        Complete!
+
+    查看已安装的docker相关软件
+        [root@localhost ~]# yum list installed | grep docker
+        containerd.io.x86_64                  1.2.10-3.2.el7                  @docker-ce-stable
+        docker-ce.x86_64                      3:19.03.4-3.el7                 @docker-ce-stable
+        docker-ce-cli.x86_64                  1:19.03.4-3.el7                 @docker-ce-stable
+
+    开机启动docker
+        [root@localhost ~]# systemctl enable docker
+        Created symlink from /etc/systemd/system/multi-user.target.wants/docker.service to /usr/lib/systemd/system/docker.service.
+        [root@localhost ~]# systemctl start docker
+
+    查看当前docker版本
+        [root@localhost ~]# docker -v
+        Docker version 19.03.4, build 9013bf583a
+        [root@localhost ~]#
+
+    配置国内源
+        [root@localhost ~]# cat /etc/docker/daemon.json
+        {
+          	"registry-mirrors": ["https://zpqszrst.mirror.aliyuncs.com"]
+        }
+        [root@localhost ~]#
+
+    重启docker
+        [root@localhost ~]# systemctl restart docker
+
+    查看docker的信息
+        [root@localhost ~]# docker info
+        Client:
+         Debug Mode: false
+
+        Server:
+         Containers: 0
+          Running: 0
+          Paused: 0
+          Stopped: 0
+         Images: 0
+         Server Version: 19.03.4
+         Storage Driver: overlay2
+          Backing Filesystem: xfs
+          Supports d_type: true
+          Native Overlay Diff: true
+         Logging Driver: json-file
+         Cgroup Driver: cgroupfs
+         Plugins:
+          Volume: local
+          Network: bridge host ipvlan macvlan null overlay
+          Log: awslogs fluentd gcplogs gelf journald json-file local logentries splunk syslog
+         Swarm: inactive
+         Runtimes: runc
+         Default Runtime: runc
+         Init Binary: docker-init
+         containerd version: b34a5c8af56e510852c35414db4c1f4fa6172339
+         runc version: 3e425f80a8c931f88e6d94a8c831b9d5aa481657
+         init version: fec3683
+         Security Options:
+          seccomp
+           Profile: default
+         Kernel Version: 3.10.0-957.el7.x86_64
+         Operating System: CentOS Linux 7 (Core)
+         OSType: linux
+         Architecture: x86_64
+         CPUs: 1
+         Total Memory: 468.6MiB
+         Name: localhost
+         ID: W5FB:KBVX:YE4A:ZSRS:LMNW:7BG6:B3U3:6HI2:YNGJ:UXFZ:RDZ3:NYFG
+         Docker Root Dir: /var/lib/docker
+         Debug Mode: false
+         Registry: https://index.docker.io/v1/
+         Labels:
+         Experimental: false
+         Insecure Registries:
+          127.0.0.0/8
+         Registry Mirrors:
+          https://registry.docker-cn.com/
+          https://docker.mirrors.ustc.edu.cn/
+         Live Restore Enabled: false
+
+        WARNING: bridge-nf-call-iptables is disabled
+        WARNING: bridge-nf-call-ip6tables is disabled
+
+
+
+# docker 推送镜像到自己的私有库
+    # 创建私有仓库，https://cr.console.aliyun.com/cn-hangzhou/instances/repositories
+    # docker登录
+    [root@k8snode1 ~]# docker login --username=18166748035@163.com registry.cn-hangzhou.aliyuncs.com
+    Password: wzf5831xxx
+    WARNING! Your password will be stored unencrypted in /root/.docker/config.json.
+    Configure a credential helper to remove this warning. See
+    https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+
+    Login Succeeded
+
+    [root@k8snode1 ~]# cat /root/.docker/config.json
+    {
+        "auths": {
+            "registry.cn-hangzhou.aliyuncs.com": {
+                "auth": "MTgxNjY3NDgwMzVAMTYzLmNvbTp3emY1ODMxMzE1"
+            }
+        },
+        "HttpHeaders": {
+            "User-Agent": "Docker-Client/19.03.4 (linux)"
+        }
+    }
+    # 查看本地的images
+    [root@k8snode2 ~]# docker images
+    REPOSITORY                                                           TAG                 IMAGE ID            CREATED             SIZE
+    httpd                                                                latest              d3017f59d5e2        2 weeks ago         165MB
+    nginx                                                                latest              540a289bab6c        3 weeks ago         126MB
+    registry.aliyuncs.com/google_containers/kube-proxy                   v1.16.2             8454cbe08dc9        4 weeks ago         86.1MB
+    registry.aliyuncs.com/google_containers/coredns                      1.6.2               bf261d157914        3 months ago        44.1MB
+    quay-mirror.qiniu.com/coreos/flannel                                 v0.11.0-amd64       ff281650a721        9 months ago        52.6MB
+    registry.aliyuncs.com/google_containers/kubernetes-dashboard-amd64   v1.10.1             f9aed6605b81        11 months ago       122MB
+    registry.aliyuncs.com/google_containers/pause                        3.1                 da86e6ba6ca1        23 months ago       742kB
+
+    # 修改tag
+    [root@k8snode2 ~]# docker tag 540a289bab6c registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx:0.1
+    [root@k8snode2 ~]# docker images
+    REPOSITORY                                                           TAG                 IMAGE ID            CREATED             SIZE
+    httpd                                                                latest              d3017f59d5e2        2 weeks ago         165MB
+    nginx                                                                latest              540a289bab6c        3 weeks ago         126MB
+    registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx             0.1                 540a289bab6c        3 weeks ago         126MB
+    registry.aliyuncs.com/google_containers/kube-proxy                   v1.16.2             8454cbe08dc9        4 weeks ago         86.1MB
+    registry.aliyuncs.com/google_containers/coredns                      1.6.2               bf261d157914        3 months ago        44.1MB
+    quay-mirror.qiniu.com/coreos/flannel                                 v0.11.0-amd64       ff281650a721        9 months ago        52.6MB
+    registry.aliyuncs.com/google_containers/kubernetes-dashboard-amd64   v1.10.1             f9aed6605b81        11 months ago       122MB
+    registry.aliyuncs.com/google_containers/pause                        3.1                 da86e6ba6ca1        23 months ago       742kB
+
+    # docker push
+    [root@k8snode2 ~]# docker push registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx:0.1
+    The push refers to repository [registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx]
+    a89b8f05da3a: Pushed
+    6eaad811af02: Pushed
+    b67d19e65ef6: Pushed
+    0.1: digest: sha256:f56b43e9913cef097f246d65119df4eda1d61670f7f2ab720831a01f66f6ff9c size: 948
+
+    # 删除本地 m_nginx
+    [root@k8snode2 ~]# docker rmi registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx:0.1
+    Untagged: registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx:0.1
+    Untagged: registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx@sha256:f56b43e9913cef097f246d65119df4eda1d61670f7f2ab720831a01f66f6ff9c
+    [root@k8snode2 ~]# docker images
+    REPOSITORY                                                           TAG                 IMAGE ID            CREATED             SIZE
+    httpd                                                                latest              d3017f59d5e2        2 weeks ago         165MB
+    nginx                                                                latest              540a289bab6c        3 weeks ago         126MB
+    registry.aliyuncs.com/google_containers/kube-proxy                   v1.16.2             8454cbe08dc9        4 weeks ago         86.1MB
+    registry.aliyuncs.com/google_containers/coredns                      1.6.2               bf261d157914        3 months ago        44.1MB
+    quay-mirror.qiniu.com/coreos/flannel                                 v0.11.0-amd64       ff281650a721        9 months ago        52.6MB
+    registry.aliyuncs.com/google_containers/kubernetes-dashboard-amd64   v1.10.1             f9aed6605b81        11 months ago       122MB
+    registry.aliyuncs.com/google_containers/pause                        3.1                 da86e6ba6ca1        23 months ago       742kB
+
+    # 从私有仓库拉取 m_nginx
+    [root@k8snode2 ~]# docker pull registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx:0.1
+    0.1: Pulling from docker_for_k8s/m_nginx
+    Digest: sha256:f56b43e9913cef097f246d65119df4eda1d61670f7f2ab720831a01f66f6ff9c
+    Status: Downloaded newer image for registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx:0.1
+    registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx:0.1
+
+    # 查看拉取到的镜像
+    [root@k8snode2 ~]# docker images
+    REPOSITORY                                                           TAG                 IMAGE ID            CREATED             SIZE
+    httpd                                                                latest              d3017f59d5e2        2 weeks ago         165MB
+    nginx                                                                latest              540a289bab6c        3 weeks ago         126MB
+    registry.cn-hangzhou.aliyuncs.com/docker_for_k8s/m_nginx             0.1                 540a289bab6c        3 weeks ago         126MB
+    registry.aliyuncs.com/google_containers/kube-proxy                   v1.16.2             8454cbe08dc9        4 weeks ago         86.1MB
+    registry.aliyuncs.com/google_containers/coredns                      1.6.2               bf261d157914        3 months ago        44.1MB
+    quay-mirror.qiniu.com/coreos/flannel                                 v0.11.0-amd64       ff281650a721        9 months ago        52.6MB
+    registry.aliyuncs.com/google_containers/kubernetes-dashboard-amd64   v1.10.1             f9aed6605b81        11 months ago       122MB
+    registry.aliyuncs.com/google_containers/pause                        3.1                 da86e6ba6ca1        23 months ago       742kB
+
+
+
 
 
 

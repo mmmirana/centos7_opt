@@ -1,0 +1,110 @@
+使用k8s集群部署应用，这里以部署nginx为例
+1、创建 nginx 应用
+    [root@k8smaster ~]# kubectl create deployment nginx --image=nginx
+    deployment.apps/nginx created
+    [root@k8smaster ~]# kubectl get deployments
+    NAME    READY   UP-TO-DATE   AVAILABLE   AGE
+    nginx   0/1     1            0           28s
+2、创建 nginx service
+    [root@k8smaster ~]# kubectl create service nodeport nginx --tcp 80:80
+    service/nginx created
+    [root@k8smaster ~]# kubectl get svc
+    NAME         TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
+    kubernetes   ClusterIP   10.96.0.1     <none>        443/TCP        48m
+    nginx        NodePort    10.96.172.1   <none>        80:30414/TCP   13s
+3、访问nginx
+    # 访问不通
+    [root@k8smaster ~]# curl localhost:30414
+    ^
+    [root@k8smaster ~]# netstat -lnp|grep 30414
+    tcp6       2      0 :::30414                :::*                    LISTEN      19943/kube-proxy
+
+4、查看nodes和pods
+    [root@k8smaster ~]# kubectl get nodes
+    NAME        STATUS   ROLES    AGE   VERSION
+    k8smaster   Ready    master   50m   v1.16.2
+    k8snode1    Ready    <none>   24m   v1.16.2
+    k8snode2    Ready    <none>   17m   v1.16.2
+    [root@k8smaster ~]# kubectl get pods -A -o wide
+    NAMESPACE     NAME                                READY   STATUS    RESTARTS   AGE     IP                NODE        NOMINATED NODE   READINESS GATES
+    default       nginx-86c57db685-tmmfp              1/1     Running   0          3m24s   10.244.3.3        k8snode1    <none>           <none>
+    kube-system   coredns-58cc8c89f4-8lnsd            1/1     Running   0          18m     10.244.3.2        k8snode1    <none>           <none>
+    kube-system   coredns-58cc8c89f4-s4k8n            1/1     Running   0          28m     10.244.0.2        k8smaster   <none>           <none>
+    kube-system   etcd-k8smaster                      1/1     Running   0          49m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-apiserver-k8smaster            1/1     Running   0          49m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-controller-manager-k8smaster   1/1     Running   0          49m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-flannel-ds-amd64-nbbnt         1/1     Running   0          40m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-flannel-ds-amd64-rd79g         1/1     Running   0          17m     192.168.237.132   k8snode2    <none>           <none>
+    kube-system   kube-flannel-ds-amd64-spx92         1/1     Running   0          24m     192.168.237.131   k8snode1    <none>           <none>
+    kube-system   kube-proxy-c9nxm                    1/1     Running   0          50m     192.168.237.130   k8smaster   <none>           <none>
+    kube-system   kube-proxy-pbsmm                    1/1     Running   0          24m     192.168.237.131   k8snode1    <none>           <none>
+    kube-system   kube-proxy-xplpk                    1/1     Running   0          17m     192.168.237.132   k8snode2    <none>           <none>
+    kube-system   kube-scheduler-k8smaster            1/1     Running   0          49m     192.168.237.130   k8smaster   <none>           <none>
+
+    # 查看nginx无法访问的原因
+    [root@k8smaster ~]# kubectl describe pods/nginx-86c57db685-tmmfp
+    Name:         nginx-86c57db685-tmmfp
+    Namespace:    default
+    Priority:     0
+    Node:         k8snode1/192.168.237.131
+    Start Time:   Sun, 17 Nov 2019 01:27:53 +0800
+    Labels:       app=nginx
+                  pod-template-hash=86c57db685
+    Annotations:  <none>
+    Status:       Running
+    IP:           10.244.3.3
+    IPs:
+      IP:           10.244.3.3
+    Controlled By:  ReplicaSet/nginx-86c57db685
+    Containers:
+      nginx:
+        Container ID:   docker://635f1b911435d15d72a4c4310f89dab25c88fb161a3855c05da5e5dc82368591
+        Image:          nginx
+        Image ID:       docker-pullable://nginx@sha256:922c815aa4df050d4df476e92daed4231f466acc8ee90e0e774951b0fd7195a4
+        Port:           <none>
+        Host Port:      <none>
+        State:          Running
+          Started:      Sun, 17 Nov 2019 01:28:22 +0800
+        Ready:          True
+        Restart Count:  0
+        Environment:    <none>
+        Mounts:
+          /var/run/secrets/kubernetes.io/serviceaccount from default-token-f2tm6 (ro)
+    Conditions:
+      Type              Status
+      Initialized       True
+      Ready             True
+      ContainersReady   True
+      PodScheduled      True
+    Volumes:
+      default-token-f2tm6:
+        Type:        Secret (a volume populated by a Secret)
+        SecretName:  default-token-f2tm6
+        Optional:    false
+    QoS Class:       BestEffort
+    Node-Selectors:  <none>
+    Tolerations:     node.kubernetes.io/not-ready:NoExecute for 300s
+                     node.kubernetes.io/unreachable:NoExecute for 300s
+    Events:
+      Type    Reason     Age        From               Message
+      ----    ------     ----       ----               -------
+      Normal  Scheduled  <unknown>  default-scheduler  Successfully assigned default/nginx-86c57db685-tmmfp to k8snode1
+      Normal  Pulling    14m        kubelet, k8snode1  Pulling image "nginx"
+      Normal  Pulled     14m        kubelet, k8snode1  Successfully pulled image "nginx"
+      Normal  Created    14m        kubelet, k8snode1  Created container nginx
+      Normal  Started    14m        kubelet, k8snode1  Started container nginx
+    [root@k8smaster ~]# kubectl logs pods/nginx-86c57db685-tmmfp
+    Error from server: Get https://192.168.237.131:10250/containerLogs/default/nginx-86c57db685-tmmfp/nginx: dial tcp 192.168.237.131:10250: connect: connection timed out
+
+    # 在所有主机上开放10250端口，暂时没有解决
+    [root@k8smaster ~]# systemctl enable firewalld
+    Created symlink from /etc/systemd/system/dbus-org.fedoraproject.FirewallD1.service to /usr/lib/systemd/system/firewalld.service.
+    Created symlink from /etc/systemd/system/multi-user.target.wants/firewalld.service to /usr/lib/systemd/system/firewalld.service.
+    [root@k8smaster ~]# systemctl start firewalld
+    [root@k8smaster ~]# firewall-cmd --zone=public --add-port=10250/tcp --permanent
+    success
+    [root@k8smaster ~]# firewall-cmd --reload
+    success
+    [root@k8smaster ~]#
+
+
