@@ -1070,20 +1070,6 @@ EOF
         # 通过clusterip+port的方式在所有的节点上都访问不了
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 五、安装Ingress
     1、部署nginx-ingress-controller
         [root@k8smaster ~]# wget https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/mandatory.yaml
@@ -1441,29 +1427,314 @@ EOF
             </html>
 
 
+六、安装kubernate-dashboard
 
+    参考 https://www.cnblogs.com/bluersw/p/11747161.html
 
+    # 查看需要的版本 https://github.com/kubernetes/dashboard/releases
 
+    [root@k8smaster ~]# kubectl version
+    Client Version: version.Info{Major:"1", Minor:"16", GitVersion:"v1.16.2", GitCommit:"c97fe5036ef3df2967d086711e6c0c405941e14b", GitTreeState:"clean", BuildDate:"2019-10-15T19:18:23Z", GoVersion:"go1.12.10", Compiler:"gc", Platform:"linux/amd64"}
+    Server Version: version.Info{Major:"1", Minor:"16", GitVersion:"v1.16.2", GitCommit:"c97fe5036ef3df2967d086711e6c0c405941e14b", GitTreeState:"clean", BuildDate:"2019-10-15T19:09:08Z", GoVersion:"go1.12.10", Compiler:"gc", Platform:"linux/amd64"}
 
-
-dashboard
     # 下载k8s-dashboard.yaml
-    [root@k8smaster ~]# wget https://raw.githubuserNodePort.com/kubernetes/dashboard/v1.10.1/src/deploy/recommended/kubernetes-dashboard.yaml
-    --2019-11-17 20:52:34--  https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.1/src/deploy/recommended/kubernetes-dashboard.yaml
-    Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 151.101.108.133
-    Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|151.101.108.133|:443... connected.
+    [root@k8smaster ~]# wget https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0-beta6/aio/deploy/recommended.yaml
+    --2019-11-20 12:05:04--  https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0-beta6/aio/deploy/recommended.yaml
+    Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 151.101.40.133
+    Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|151.101.40.133|:443... connected.
     HTTP request sent, awaiting response... 200 OK
-    Length: 4577 (4.5K) [text/plain]
-    Saving to: ‘kubernetes-dashboard.yaml’
+    Length: 7568 (7.4K) [text/plain]
+    Saving to: ‘recommended.yaml’
 
-    100%[========================================================================================================================================================================>] 4,577       28.0KB/s   in 0.2s
+    100%[========================================================================================================================================================================>] 7,568       --.-K/s   in 0s
 
-    2019-11-17 20:52:39 (28.0 KB/s) - ‘kubernetes-dashboard.yaml’ saved [4577/4577]
+    2019-11-20 12:05:05 (88.4 MB/s) - ‘recommended.yaml’ saved [7568/7568]
 
-    # 修改 kubernetes-dashboard.yaml 的docker镜像地址
-    # ------------------- Dashboard Deployment ------------------- #
-    找到spec.template.spec.containers.image，调整为
-        image: registry.aliyuncs.com/google_containers/kubernetes-dashboard-amd64:v1.10.1
-    # ------------------- Dashboard Service -------------------
-    在spec下新增
-        type: NodePort
+    [root@k8smaster ~]# mv recommended.yaml k8s-dashboard.yaml
+    [root@k8smaster ~]# cp k8s-dashboard.yaml k8s-dashboard.bk.yaml
+
+    # kubectl apply
+    [root@k8smaster ~]# kubectl apply -f k8s-dashboard.yaml
+    namespace/kubernetes-dashboard created
+    serviceaccount/kubernetes-dashboard created
+    service/kubernetes-dashboard created
+    secret/kubernetes-dashboard-certs created
+    secret/kubernetes-dashboard-csrf created
+    secret/kubernetes-dashboard-key-holder created
+    configmap/kubernetes-dashboard-settings created
+    role.rbac.authorization.k8s.io/kubernetes-dashboard created
+    clusterrole.rbac.authorization.k8s.io/kubernetes-dashboard created
+    rolebinding.rbac.authorization.k8s.io/kubernetes-dashboard created
+    clusterrolebinding.rbac.authorization.k8s.io/kubernetes-dashboard created
+    deployment.apps/kubernetes-dashboard created
+    service/dashboard-metrics-scraper created
+    deployment.apps/dashboard-metrics-scraper created
+
+    # deployments
+    [root@k8smaster ~]# kubectl get deployments -n kubernetes-dashboard -o wide
+    NAME                        READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS                  IMAGES                                SELECTOR
+    dashboard-metrics-scraper   1/1     1            1           21s   dashboard-metrics-scraper   kubernetesui/metrics-scraper:v1.0.1   k8s-app=dashboard-metrics-scraper
+    kubernetes-dashboard        1/1     1            1           21s   kubernetes-dashboard        kubernetesui/dashboard:v2.0.0-beta6   k8s-app=kubernetes-dashboard
+
+    # services
+    [root@k8smaster ~]# kubectl get services -n kubernetes-dashboard -o wide
+    NAME                        TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)         AGE   SELECTOR
+    dashboard-metrics-scraper   ClusterIP   10.101.84.34     <none>        8000/TCP        33s   k8s-app=dashboard-metrics-scraper
+    kubernetes-dashboard        NodePort    10.109.220.155   <none>        443:31000/TCP   33s   k8s-app=kubernetes-dashboard
+
+    # secrets
+    [root@k8smaster ~]# kubectl get secrets -n kubernetes-dashboard -o wide
+    NAME                               TYPE                                  DATA   AGE
+    default-token-rq6ws                kubernetes.io/service-account-token   3      47s
+    kubernetes-dashboard-certs         Opaque                                0      47s
+    kubernetes-dashboard-csrf          Opaque                                1      47s
+    kubernetes-dashboard-key-holder    Opaque                                2      47s
+    kubernetes-dashboard-token-x6xnn   kubernetes.io/service-account-token   3      47s
+
+    # pods
+    [root@k8smaster ~]# kubectl get pods -n kubernetes-dashboard -o wide
+    NAME                                         READY   STATUS    RESTARTS   AGE   IP            NODE        NOMINATED NODE   READINESS GATES
+    dashboard-metrics-scraper-76585494d8-9fl67   1/1     Running   0          57s   10.244.0.20   k8smaster   <none>           <none>
+    kubernetes-dashboard-b65488c4-vmcgg          1/1     Running   0          57s   10.244.0.19   k8smaster   <none>           <none>
+
+    # windows主机浏览器访问
+    1、http://192.168.237.130:31000/
+        Client sent an HTTP request to an HTTPS server.
+    2、https://192.168.237.130:31000/
+        您的连接不是私密连接
+        攻击者可能会试图从 192.168.237.130 窃取您的信息（例如：密码、通讯内容或信用卡信息）。了解详情
+        NET::ERR_CERT_INVALID
+
+        您可以选择向 Google 发送一些系统信息和网页内容，以帮助我们改进安全浏览功能。隐私权政策
+        192.168.237.130 通常会使用加密技术来保护您的信息。Google Chrome 此次尝试连接到 192.168.237.130 时，此网站发回了异常的错误凭据。这可能是因为有攻击者在试图冒充 192.168.237.130，或 Wi-Fi 登录屏幕中断了此次连接。请放心，您的信息仍然是安全的，因为 Google Chrome 尚未进行任何数据交换便停止了连接。
+
+        您目前无法访问 192.168.237.130，因为此网站发送了 Google Chrome 无法处理的杂乱凭据。网络错误和攻击通常是暂时的，因此，此网页稍后可能会恢复正常。
+
+
+    # 创建证书后再访问
+
+    # delete
+    [root@k8smaster ~]# kubectl delete -f k8s-dashboard.yaml
+
+    # 开始创建证书
+    [root@k8smaster ~]# cd /etc/kubernetes/pki/
+    [root@k8smaster pki]# openssl genrsa -out dashboard.key 2048
+    Generating RSA private key, 2048 bit long modulus
+    .........................................................................+++
+    ............+++
+    e is 65537 (0x10001)
+    [root@k8smaster pki]# openssl req -new -key dashboard.key -out dashboard.csr -subj "/O=qiangungun/CN=kubernetes-dashboard"
+    [root@k8smaster pki]# openssl x509 -req -in dashboard.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out dashboard.crt -days 3650
+    Signature ok
+    subject=/O=qiangungun/CN=kubernetes-dashboard
+    Getting CA Private Key
+    # 创建证书完毕
+
+    # 创建 namespace=kubernetes-dashboard 的命名空间
+    [root@k8smaster ~]# kubectl create namespace kubernetes-dashboard
+    namespace/kubernetes-dashboard created
+    # 重新生成 namespace=kubernetes-dashboard 的 kubernetes-dashboard-certs 证书
+    [root@k8smaster pki]# kubectl create secret generic kubernetes-dashboard-certs --from-file=dashboard.crt=./dashboard.crt --from-file=dashboard.key=./dashboard.key  -n kubernetes-dashboard
+    secret/kubernetes-dashboard-certs created
+
+    # 查看 kubernetes-dashboard 的证书
+    [root@k8smaster ~]# kubectl get secrets -n kubernetes-dashboard
+    NAME                         TYPE                                  DATA   AGE
+    default-token-lcs22          kubernetes.io/service-account-token   3      80s
+    kubernetes-dashboard-certs   Opaque                                2      10s
+
+    # 修改 k8s-dashboard.yaml
+    # service 指定NodePort方式
+    # 注释掉secret
+
+    # 重新应用
+    [root@k8smaster ~]# kubectl apply -f k8s-dashboard.yaml
+    Warning: kubectl apply should be used on resource created by either kubectl create --save-config or kubectl apply
+    namespace/kubernetes-dashboard configured
+    serviceaccount/kubernetes-dashboard created
+    service/kubernetes-dashboard created
+    secret/kubernetes-dashboard-csrf created
+    secret/kubernetes-dashboard-key-holder created
+    configmap/kubernetes-dashboard-settings created
+    role.rbac.authorization.k8s.io/kubernetes-dashboard created
+    clusterrole.rbac.authorization.k8s.io/kubernetes-dashboard created
+    rolebinding.rbac.authorization.k8s.io/kubernetes-dashboard created
+    clusterrolebinding.rbac.authorization.k8s.io/kubernetes-dashboard created
+    deployment.apps/kubernetes-dashboard created
+    service/dashboard-metrics-scraper created
+    deployment.apps/dashboard-metrics-scraper created
+
+    # 查看 dashboard pod
+    [root@k8smaster ~]# kubectl get pods -n kubernetes-dashboard -o wide
+    NAME                                         READY   STATUS    RESTARTS   AGE   IP            NODE        NOMINATED NODE   READINESS GATES
+    dashboard-metrics-scraper-76585494d8-zmlkx   1/1     Running   0          38s   10.244.0.33   k8smaster   <none>           <none>
+    kubernetes-dashboard-b65488c4-9lszk          1/1     Running   0          38s   10.244.0.32   k8smaster   <none>           <none>
+
+    # 查看service
+    [root@k8smaster ~]# kubectl get services -n kubernetes-dashboard -o wide
+    NAME                        TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)         AGE    SELECTOR
+    dashboard-metrics-scraper   ClusterIP   10.97.26.9       <none>        8000/TCP        111s   k8s-app=dashboard-metrics-scraper
+    kubernetes-dashboard        NodePort    10.107.102.143   <none>        443:31000/TCP   111s   k8s-app=kubernetes-dashboard
+
+    # windows 主机访问 k8smaster dashboard，可以正常访问
+        https://192.168.237.130:31000/
+        您的连接不是私密连接
+        攻击者可能会试图从 192.168.237.130 窃取您的信息（例如：密码、通讯内容或信用卡信息）。了解详情
+        NET::ERR_CERT_AUTHORITY_INVALID
+
+        您可以选择向 Google 发送一些系统信息和网页内容，以帮助我们改进安全浏览功能。隐私权政策
+        此服务器无法证明它是192.168.237.130；您计算机的操作系统不信任其安全证书。出现此问题的原因可能是配置有误或您的连接被拦截了。
+
+        继续前往192.168.237.130（不安全）
+
+    # 创建用户，分配权限
+    [root@k8smaster ~]# kubectl apply -f k8s-dashboard-admin.yaml
+    serviceaccount/dashboard-admin created
+    [root@k8smaster ~]# kubectl apply -f k8s-dashboard-adminrole.yaml
+    clusterrolebinding.rbac.authorization.k8s.io/dashboard-admin-bind-cluster-role created
+
+    # 查看用户token
+    [root@k8smaster ~]# kubectl -n kubernetes-dashboard describe secret $(kubectl -n kubernetes-dashboard get secret | grep dashboard-admin | awk '{print $1}')
+    Name:         dashboard-admin-token-dp5ch
+    Namespace:    kubernetes-dashboard
+    Labels:       <none>
+    Annotations:  kubernetes.io/service-account.name: dashboard-admin
+               kubernetes.io/service-account.uid: fad34505-7d39-4791-825c-a85de6436556
+
+    Type:  kubernetes.io/service-account-token
+
+    Data
+    ====
+    ca.crt:     1025 bytes
+    namespace:  20 bytes
+    token:      eyJhbGciOiJSUzI1NiIsImtpZCI6InhzUTNVMjJ3S1FtVENJdngycFMtTU1oWk5WVi1XMWNRU2hfZVhXVThYVWsifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlcm5ldGVzLWRhc2hib2FyZCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJkYXNoYm9hcmQtYWRtaW4tdG9rZW4tZHA1Y2giLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiZGFzaGJvYXJkLWFkbWluIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiZmFkMzQ1MDUtN2QzOS00NzkxLTgyNWMtYTg1ZGU2NDM2NTU2Iiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50Omt1YmVybmV0ZXMtZGFzaGJvYXJkOmRhc2hib2FyZC1hZG1pbiJ9.nrTevD6wnFyWQ6_G6ojG11xy-J9nww8-gf1HbKaCzbNGwTLeUlMV8GjslPGvsDm5xxF-FDPjQAxuRWv0NUg4otQ1WAIParQiVTBbQ9AZO_QxNg0-hxhdkF9FOR-W6pkTM01DVmlhRJ-xW406FWwQxv0dM-2Om7w8eO8py0YHKOF735WmyUIN3spxI58gelgs8Z2pqHjSEL7gK5hwC2ef3LMzoth_CAg-qn75OM5o40wDCiMqc-6-hpn363FJ2B62SY_473nexbhl0TzmnxiN6zYf7qCTR2PRCEr3vyWKmpC1pvkzQNa8Zy17bWwokFwU5vC6y-BeZ7J2QtzQ3rErDw
+
+    windows主机访问：https://192.168.237.130:31000/#/login
+    单选框选择token，输入上面的token值，点击sign in，即可登录完成
+
+    token 过期
+    k8s-dashboard.yaml 新增参数token-ttl=43200
+      containers:
+        - name: kubernetes-dashboard
+          image: kubernetesui/dashboard:v2.0.0-beta6
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8443
+              protocol: TCP
+          args:
+            - --auto-generate-certificates
+            - --namespace=kubernetes-dashboard
+            - --token-ttl=43200 # 解决token过期
+
+
+    # 部署 metrics-server
+
+    # 给k8smaster打标签 metrics=true
+    [root@k8smaster ~]# kubectl label node k8smaster metrics=yes
+    node/k8smaster labeled
+
+    [root@k8smaster ~]# cd metrics-server/
+    [root@k8smaster metrics-server]# wget https://raw.githubusercontent.com/kubernetes-incubator/metrics-server/master/deploy/1.8%2B/aggregated-metrics-reader.yaml
+    [root@k8smaster metrics-server]# wget https://raw.githubusercontent.com/kubernetes-incubator/metrics-server/master/deploy/1.8%2B/auth-delegator.yaml
+    [root@k8smaster metrics-server]# wget https://raw.githubusercontent.com/kubernetes-incubator/metrics-server/master/deploy/1.8%2B/auth-reader.yaml
+    [root@k8smaster metrics-server]# wget https://raw.githubusercontent.com/kubernetes-incubator/metrics-server/master/deploy/1.8%2B/metrics-apiservice.yaml
+    [root@k8smaster metrics-server]# wget https://raw.githubusercontent.com/kubernetes-incubator/metrics-server/master/deploy/1.8%2B/metrics-server-deployment.yaml
+    [root@k8smaster metrics-server]# wget https://raw.githubusercontent.com/kubernetes-incubator/metrics-server/master/deploy/1.8%2B/metrics-server-service.yaml
+    [root@k8smaster metrics-server]# wget https://raw.githubusercontent.com/kubernetes-incubator/metrics-server/master/deploy/1.8%2B/resource-reader.yaml
+    [root@k8smaster metrics-server]# wget https://raw.githubusercontent.com/kubernetes-incubator/metrics-server/master/deploy/1.8%2B/auth-reader.yaml
+    [root@k8smaster metrics-server]# ll
+    total 24
+    -rw-r--r-- 1 root root  397 Nov 21 00:22 aggregated-metrics-reader.yaml
+    -rw-r--r-- 1 root root  303 Nov 21 00:22 auth-delegator.yaml
+    -rw-r--r-- 1 root root  324 Nov 21 00:23 auth-reader.yaml
+    -rw-r--r-- 1 root root 1373 Nov 21 00:28 metrics-server-deployment.yaml
+    -rw-r--r-- 1 root root  297 Nov 21 00:22 metrics-server-service.yaml
+    -rw-r--r-- 1 root root  517 Nov 21 00:22 resource-reader.yaml
+    # 调整 metrics-server-deployment.yaml
+          containers:
+          - name: metrics-server
+            # image: k8s.gcr.io/metrics-server-amd64:v0.3.6 修改镜像源
+            image: mirrorgooglecontainers/metrics-server-amd64:v0.3.6
+            args:
+              # - --cert-dir=/tmp
+              # - --secure-port=4443
+              - --kubelet-insecure-tls # 新增参数
+              - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname # 新增参数
+
+        nodeSelector:
+          # beta.kubernetes.io/os: linux
+          metrics: "yes" # 将metrics部署到master上
+
+    [root@k8smaster ~]# kubectl apply -f metrics-server/
+    clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
+    clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
+    rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
+    apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io created
+    serviceaccount/metrics-server created
+    deployment.apps/metrics-server created
+    service/metrics-server created
+    clusterrole.rbac.authorization.k8s.io/system:metrics-server created
+    clusterrolebinding.rbac.authorization.k8s.io/system:metrics-server created
+
+
+    [root@k8smaster ~]# kubectl logs -n kube-system pod/metrics-server-544f484bdb-fmswz
+    Error: error creating self-signed certificates: mkdir apiserver.local.config: read-only file system
+    Usage:
+       [flags]
+
+    Flags:
+          --alsologtostderr                                         log to standard error as well as files
+          --authentication-kubeconfig string                        kubeconfig file pointing at the 'core' kubernetes server with enough rights to create tokenaccessreviews.authentication.k8s.io.
+          --authentication-skip-lookup                              If false, the authentication-kubeconfig will be used to lookup missing authentication configuration from the cluster.
+          --authentication-token-webhook-cache-ttl duration         The duration to cache responses from the webhook token authenticator. (default 10s)
+          --authentication-tolerate-lookup-failure                  If true, failures to look up missing authentication configuration from the cluster are not considered fatal. Note that this can result in authentication that treats all requests as anonymous.
+          --authorization-always-allow-paths strings                A list of HTTP paths to skip during authorization, i.e. these are authorized without contacting the 'core' kubernetes server.
+          --authorization-kubeconfig string                         kubeconfig file pointing at the 'core' kubernetes server with enough rights to create subjectaccessreviews.authorization.k8s.io.
+          --authorization-webhook-cache-authorized-ttl duration     The duration to cache 'authorized' responses from the webhook authorizer. (default 10s)
+          --authorization-webhook-cache-unauthorized-ttl duration   The duration to cache 'unauthorized' responses from the webhook authorizer. (default 10s)
+          --bind-address ip                                         The IP address on which to listen for the --secure-port port. The associated interface(s) must be reachable by the rest of the cluster, and by CLI/web clients. If blank, all interfaces will be used (0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces). (default 0.0.0.0)
+          --cert-dir string                                         The directory where the TLS certs are located. If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored. (default "apiserver.local.config/certificates")
+          --client-ca-file string                                   If set, any request presenting a client certificate signed by one of the authorities in the client-ca-file is authenticated with an identity corresponding to the CommonName of the client certificate.
+          --contention-profiling                                    Enable lock contention profiling, if profiling is enabled
+      -h, --help                                                    help for this command
+          --http2-max-streams-per-connection int                    The limit that the server gives to clients for the maximum number of streams in an HTTP/2 connection. Zero means to use golang's default.
+          --kubeconfig string                                       The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)
+          --kubelet-certificate-authority string                    Path to the CA to use to validate the Kubelet's serving certificates.
+          --kubelet-insecure-tls                                    Do not verify CA of serving certificates presented by Kubelets.  For testing purposes only.
+          --kubelet-port int                                        The port to use to connect to Kubelets. (default 10250)
+          --kubelet-preferred-address-types strings                 The priority of node address types to use when determining which address to use to connect to a particular node (default [Hostname,InternalDNS,InternalIP,ExternalDNS,ExternalIP])
+          --log-flush-frequency duration                            Maximum number of seconds between log flushes (default 5s)
+          --log_backtrace_at traceLocation                          when logging hits line file:N, emit a stack trace (default :0)
+          --log_dir string                                          If non-empty, write log files in this directory
+          --log_file string                                         If non-empty, use this log file
+          --logtostderr                                             log to standard error instead of files (default true)
+          --metric-resolution duration                              The resolution at which metrics-server will retain metrics. (default 1m0s)
+          --profiling                                               Enable profiling via web interface host:port/debug/pprof/ (default true)
+          --requestheader-allowed-names strings                     List of client certificate common names to allow to provide usernames in headers specified by --requestheader-username-headers. If empty, any client certificate validated by the authorities in --requestheader-client-ca-file is allowed.
+          --requestheader-client-ca-file string                     Root certificate bundle to use to verify client certificates on incoming requests before trusting usernames in headers specified by --requestheader-username-headers. WARNING: generally do not depend on authorization being already done for incoming requests.
+          --requestheader-extra-headers-prefix strings              List of request header prefixes to inspect. X-Remote-Extra- is suggested. (default [x-remote-extra-])
+          --requestheader-group-headers strings                     List of request headers to inspect for groups. X-Remote-Group is suggested. (default [x-remote-group])
+          --requestheader-username-headers strings                  List of request headers to inspect for usernames. X-Remote-User is common. (default [x-remote-user])
+          --secure-port int                                         The port on which to serve HTTPS with authentication and authorization.If 0, don't serve HTTPS at all. (default 443)
+          --skip_headers                                            If true, avoid header prefixes in the log messages
+          --stderrthreshold severity                                logs at or above this threshold go to stderr
+          --tls-cert-file string                                    File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated after server cert). If HTTPS serving is enabled, and --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key are generated for the public address and saved to the directory specified by --cert-dir.
+          --tls-cipher-suites strings                               Comma-separated list of cipher suites for the server. If omitted, the default Go cipher suites will be use.  Possible values: TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_RC4_128_SHA,TLS_RSA_WITH_3DES_EDE_CBC_SHA,TLS_RSA_WITH_AES_128_CBC_SHA,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_256_CBC_SHA,TLS_RSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_RC4_128_SHA
+          --tls-min-version string                                  Minimum TLS version supported. Possible values: VersionTLS10, VersionTLS11, VersionTLS12
+          --tls-private-key-file string                             File containing the default x509 private key matching --tls-cert-file.
+          --tls-sni-cert-key namedCertKey                           A pair of x509 certificate and private key file paths, optionally suffixed with a list of domain patterns which are fully qualified domain names, possibly with prefixed wildcard segments. If no domain patterns are provided, the names of the certificate are extracted. Non-wildcard matches trump over wildcard matches, explicit domain patterns trump over extracted names. For multiple key/certificate pairs, use the --tls-sni-cert-key multiple times. Examples: "example.crt,example.key" or "foo.crt,foo.key:*.foo.com,foo.com". (default [])
+      -v, --v Level                                                 number for the log level verbosity
+          --vmodule moduleSpec                                      comma-separated list of pattern=N settings for file-filtered logging
+
+    panic: error creating self-signed certificates: mkdir apiserver.local.config: read-only file system
+
+    goroutine 1 [running]:
+    main.main()
+    	/go/src/github.com/kubernetes-incubator/metrics-server/cmd/metrics-server/metrics-server.go:39 +0x13b
+    [root@k8smaster ~]#
+
+
+
+
+
+
